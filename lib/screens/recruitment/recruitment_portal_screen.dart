@@ -18,10 +18,22 @@ class RecruitmentPortalScreen extends StatefulWidget {
 
 class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
     with TickerProviderStateMixin {
+  // ── Recruitment fields list — add more entries here to expand the dropdown ──
+  static const List<String> _recruitmentFields = [
+    'Field Officer',
+    'Regional Co-ordinator',
+  ];
+
   final _formKey = GlobalKey<FormState>();
   final _fullNameController = TextEditingController();
   final _emailController = TextEditingController();
-  final _areaOfExpertiseController = TextEditingController();
+  final _homeCountyController = TextEditingController();
+
+  /// Quick (returning-user) email check controller
+  final _quickEmailController = TextEditingController();
+
+  /// Selected value from the Recruitment Field dropdown
+  String? _selectedRecruitmentField;
 
   bool _isSubmitting = false;
   bool _isUploadingFile = false;
@@ -93,7 +105,8 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
             .get();
 
         if (doc.exists) {
-          _logger.i('Existing application found — redirecting to status screen');
+          _logger.i(
+              'Existing application found — redirecting to status screen');
           if (mounted) {
             Navigator.of(context).pushReplacement(
               MaterialPageRoute(
@@ -123,7 +136,8 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
     _logger.d('RecruitmentPortalScreen disposing');
     _fullNameController.dispose();
     _emailController.dispose();
-    _areaOfExpertiseController.dispose();
+    _homeCountyController.dispose();
+    _quickEmailController.dispose();
     _fadeController.dispose();
     super.dispose();
   }
@@ -231,17 +245,12 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
 
   // ── Email registration check ──────────────────────────────────────────────
 
-  /// Returns true if the email is found in Firebase Auth (fetchSignInMethodsForEmail)
-  /// OR as the `email` field in any document in the Users collection.
-  ///
-  /// fetchSignInMethodsForEmail is a supported client-side Firebase Auth call
-  /// that returns the sign-in methods registered for an email without needing
-  /// admin SDK access. An empty list means the email is NOT registered; a
-  /// non-empty list means it IS registered.
+  /// Returns true if the email is found as the `email` field in any document
+  /// in the Users collection.
   Future<bool> _isEmailRegistered(String email) async {
     _logger.i('Checking if email is registered: $email');
 
-    // ── 1. Firebase Authentication check ─────────────────────────────────
+    // ── Firebase Authentication check (commented — use if needed) ─────────
     /*try {
       final methods = await FirebaseAuth.instance
           .fetchSignInMethodsForEmail(email);
@@ -251,12 +260,10 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
       }
       _logger.d('Email not found in Firebase Auth');
     } on FirebaseAuthException catch (e) {
-      // invalid-email or other errors — treat as not registered so we don't
-      // block a legitimate new applicant due to a transient error.
       _logger.w('fetchSignInMethodsForEmail error: ${e.code} — treating as unregistered');
     }*/
 
-    // ── 2. Users collection check (email field in documents) ─────────────
+    // ── Users collection check (email field in documents) ─────────────────
     try {
       final usersQuery = await FirebaseFirestore.instance
           .collection('Users')
@@ -265,12 +272,14 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
           .get();
 
       if (usersQuery.docs.isNotEmpty) {
-        _logger.w('Email found in Users collection doc: ${usersQuery.docs.first.id}');
+        _logger.w(
+            'Email found in Users collection doc: ${usersQuery.docs.first.id}');
         return true;
       }
       _logger.d('Email not found in Users collection');
     } catch (e) {
-      _logger.w('Error querying Users collection: $e — treating as unregistered');
+      _logger.w(
+          'Error querying Users collection: $e — treating as unregistered');
     }
 
     return false;
@@ -294,7 +303,8 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
         final fullName = data?['fullName'] as String? ?? 'applicant';
 
         if (mounted) {
-          await _showExistingApplicationDialog(fullName, status, sanitizedEmail);
+          await _showExistingApplicationDialog(
+              fullName, status, sanitizedEmail);
         }
         return true;
       }
@@ -316,7 +326,8 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
       'pending': 'Your application is awaiting review',
       'under_review': 'Your application is currently being reviewed',
       'shortlisted': 'Congratulations! You\'ve been shortlisted',
-      'not_shortlisted': 'Your application was not shortlisted for this round',
+      'not_shortlisted':
+          'Your application was not shortlisted for this round',
       'accepted': 'Congratulations! Your application was accepted',
       'rejected': 'Your previous application was not selected',
     };
@@ -327,10 +338,12 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Row(
           children: [
-            const Icon(Icons.info_outline, color: Color(0xFF7B2CBF), size: 28),
+            const Icon(Icons.info_outline,
+                color: Color(0xFF7B2CBF), size: 28),
             const SizedBox(width: 12),
             const Expanded(
                 child: Text('Application Already Submitted',
@@ -347,7 +360,10 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
             const SizedBox(height: 12),
             const Text(
               'We found an existing application submitted with this email address.',
-              style: TextStyle(fontSize: 15, color: Color(0xFF64748B), height: 1.5),
+              style: TextStyle(
+                  fontSize: 15,
+                  color: Color(0xFF64748B),
+                  height: 1.5),
             ),
             const SizedBox(height: 16),
             Container(
@@ -356,7 +372,8 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
                 color: const Color(0xFF7B2CBF).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                    color: const Color(0xFF7B2CBF).withValues(alpha: 0.3)),
+                    color:
+                        const Color(0xFF7B2CBF).withValues(alpha: 0.3)),
               ),
               child: Row(
                 children: [
@@ -375,7 +392,8 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
             ),
             const SizedBox(height: 16),
             const Text('Would you like to check your application status?',
-                style: TextStyle(fontSize: 14, color: Color(0xFF64748B))),
+                style:
+                    TextStyle(fontSize: 14, color: Color(0xFF64748B))),
           ],
         ),
         actions: [
@@ -413,14 +431,16 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Row(
           children: [
-            const Icon(Icons.lock_outline, color: Color(0xFF7B2CBF), size: 28),
+            const Icon(Icons.lock_outline,
+                color: Color(0xFF7B2CBF), size: 28),
             const SizedBox(width: 12),
             const Expanded(
-              child: Text('Account Detected',
-                  style: TextStyle(fontSize: 20)),
+              child:
+                  Text('Account Detected', style: TextStyle(fontSize: 20)),
             ),
           ],
         ),
@@ -431,7 +451,9 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
             RichText(
               text: TextSpan(
                 style: const TextStyle(
-                    fontSize: 15, color: Color(0xFF475569), height: 1.5),
+                    fontSize: 15,
+                    color: Color(0xFF475569),
+                    height: 1.5),
                 children: [
                   const TextSpan(text: 'The email address '),
                   TextSpan(
@@ -459,7 +481,6 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
             label: const Text('Sign In'),
             onPressed: () {
               Navigator.of(ctx).pop();
-              // Stop the current submission and redirect to Login
               Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const LoginScreen()),
               );
@@ -469,6 +490,289 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
               foregroundColor: Colors.white,
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  // ── Quick returning-user email check (dialog) ────────────────────────────
+
+  /// Opens a dialog where a returning user (e.g. on a new device) can enter
+  /// only their email to retrieve their existing application — no form fill
+  /// needed.
+  void _showReturningUserDialog() {
+    _quickEmailController.clear();
+
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogCtx) {
+        // Local dialog state so we don't rebuild the whole screen.
+        bool isChecking = false;
+        String? result; // null | 'invalid' | 'registered' | 'not_found' | 'error'
+
+        return StatefulBuilder(
+          builder: (dialogCtx, setDialogState) {
+            Future<void> checkEmail() async {
+              final email = _quickEmailController.text.trim();
+
+              if (email.isEmpty ||
+                  !RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(email)) {
+                setDialogState(() => result = 'invalid');
+                return;
+              }
+
+              _logger.i('Dialog email check: $email');
+              setDialogState(() {
+                isChecking = true;
+                result = null;
+              });
+
+              try {
+                // 1. Registered account check
+                final isRegistered = await _isEmailRegistered(email);
+                if (isRegistered) {
+                  _logger.w('Dialog check: registered account');
+                  setDialogState(() => result = 'registered');
+                  return;
+                }
+
+                // 2. Existing Recruitees application check
+                final sanitizedEmail = _sanitizeEmail(email);
+                final doc = await FirebaseFirestore.instance
+                    .collection('Recruitees')
+                    .doc(sanitizedEmail)
+                    .get();
+
+                if (doc.exists) {
+                  _logger.i(
+                      'Dialog check: application found — navigating');
+                  final prefs = await SharedPreferences.getInstance();
+                  await prefs.setString('recruitment_email', email);
+
+                  if (mounted) {
+                    Navigator.of(dialogCtx).pop();
+                    Navigator.of(context).pushReplacement(
+                      MaterialPageRoute(
+                        builder: (_) => RecruitmentStatusScreen(
+                          recruiteeEmail: email,
+                          sanitizedEmail: sanitizedEmail,
+                        ),
+                      ),
+                    );
+                  }
+                } else {
+                  _logger.i('Dialog check: no application found');
+                  setDialogState(() => result = 'not_found');
+                }
+              } catch (e, st) {
+                _logger.e('Dialog email check error',
+                    error: e, stackTrace: st);
+                setDialogState(() => result = 'error');
+              } finally {
+                setDialogState(() => isChecking = false);
+              }
+            }
+
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20)),
+              title: Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color:
+                          const Color(0xFF7B2CBF).withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.devices,
+                        color: Color(0xFF7B2CBF), size: 18),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Text(
+                      'Check Application Status',
+                      style: TextStyle(fontSize: 17),
+                    ),
+                  ),
+                ],
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Text(
+                    'Already applied or returning on a new device? Enter your email to retrieve your existing application.',
+                    style: TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFF64748B),
+                        height: 1.5),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: _quickEmailController,
+                    keyboardType: TextInputType.emailAddress,
+                    autofocus: true,
+                    style: const TextStyle(
+                        fontSize: 15, color: Color(0xFF1A1A2E)),
+                    decoration: InputDecoration(
+                      hintText: 'you@example.com',
+                      hintStyle: const TextStyle(
+                          color: Color(0xFF94A3B8), fontSize: 14),
+                      prefixIcon: const Icon(Icons.email_outlined,
+                          color: Color(0xFF64748B), size: 20),
+                      filled: true,
+                      fillColor: const Color(0xFFF8FAFC),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(
+                              color: Color(0xFFE2E8F0), width: 1.5)),
+                      enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(
+                              color: Color(0xFFE2E8F0), width: 1.5)),
+                      focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(
+                              color: Color(0xFF7B2CBF), width: 2)),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 14),
+                    ),
+                    onChanged: (_) {
+                      if (result != null) {
+                        setDialogState(() => result = null);
+                      }
+                    },
+                    onSubmitted: (_) => isChecking ? null : checkEmail(),
+                  ),
+
+                  // ── Result feedback ──────────────────────────────────
+                  if (result != null) ...[
+                    const SizedBox(height: 12),
+                    _buildDialogResult(result!, dialogCtx),
+                  ],
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogCtx).pop(),
+                  child: const Text('Close'),
+                ),
+                ElevatedButton(
+                  onPressed: isChecking ? null : checkEmail,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF7B2CBF),
+                    foregroundColor: Colors.white,
+                    disabledBackgroundColor: const Color(0xFFE2E8F0),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                  ),
+                  child: isChecking
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                  Colors.white)),
+                        )
+                      : const Text('Check Status',
+                          style: TextStyle(fontWeight: FontWeight.w600)),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildDialogResult(String result, BuildContext dialogCtx) {
+    Color bgColor;
+    Color borderColor;
+    Color textColor;
+    IconData icon;
+    String message;
+    Widget? actionWidget;
+
+    switch (result) {
+      case 'invalid':
+        bgColor = const Color(0xFFFEF2F2);
+        borderColor = const Color(0xFFFECACA);
+        textColor = const Color(0xFFDC2626);
+        icon = Icons.error_outline;
+        message = 'Please enter a valid email address.';
+        break;
+      case 'registered':
+        bgColor = const Color(0xFFFFF7ED);
+        borderColor = const Color(0xFFFED7AA);
+        textColor = const Color(0xFFEA580C);
+        icon = Icons.lock_outline;
+        message =
+            'This email is linked to a registered account. Please sign in to access your application.';
+        actionWidget = TextButton.icon(
+          onPressed: () {
+            Navigator.of(dialogCtx).pop();
+            Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const LoginScreen()));
+          },
+          icon: const Icon(Icons.login, size: 15),
+          label: const Text('Sign In',
+              style: TextStyle(fontWeight: FontWeight.w600)),
+          style: TextButton.styleFrom(
+              foregroundColor: const Color(0xFFEA580C),
+              padding: EdgeInsets.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+        );
+        break;
+      case 'not_found':
+        bgColor = const Color(0xFFF0FDF4);
+        borderColor = const Color(0xFFBBF7D0);
+        textColor = const Color(0xFF16A34A);
+        icon = Icons.info_outline;
+        message =
+            'No application found for this email. Please complete the form to apply.';
+        break;
+      default: // 'error'
+        bgColor = const Color(0xFFFEF2F2);
+        borderColor = const Color(0xFFFECACA);
+        textColor = const Color(0xFFDC2626);
+        icon = Icons.warning_amber_outlined;
+        message =
+            'Could not verify email. Please check your connection and try again.';
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: borderColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, color: textColor, size: 16),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(message,
+                    style: TextStyle(
+                        color: textColor,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        height: 1.4)),
+              ),
+            ],
+          ),
+          if (actionWidget != null) ...[
+            const SizedBox(height: 4),
+            actionWidget,
+          ],
         ],
       ),
     );
@@ -485,13 +789,22 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
     }
 
     if (_selectedCvFile == null) {
-      setState(() => _errorMessage = 'Please upload your CV before submitting');
+      setState(() =>
+          _errorMessage = 'Please upload your CV before submitting');
+      return;
+    }
+
+    if (_selectedRecruitmentField == null ||
+        _selectedRecruitmentField!.isEmpty) {
+      setState(() =>
+          _errorMessage = 'Please select a recruitment field');
       return;
     }
 
     final email = _emailController.text.trim();
     final fullName = _fullNameController.text.trim();
-    final areaOfExpertise = _areaOfExpertiseController.text.trim();
+    final homeCounty = _homeCountyController.text.trim();
+    final recruitmentField = _selectedRecruitmentField!;
 
     // ── Step A: Check if email belongs to a registered account ────────────
     setState(() => _isCheckingRegistered = true);
@@ -503,9 +816,10 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
     }
 
     if (registered) {
-      _logger.w('Email $email is registered — blocking submission, showing login prompt');
+      _logger.w(
+          'Email $email is registered — blocking submission, showing login prompt');
       if (mounted) await _showRegisteredEmailDialog(email);
-      return; // Stop submission — user must log in first
+      return;
     }
 
     // ── Step B: Check for duplicate Recruitees application ────────────────
@@ -536,7 +850,8 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
       final recruiteeData = {
         'fullName': fullName,
         'email': email,
-        'areaOfExpertise': areaOfExpertise,
+        'homeCounty': homeCounty,
+        'recruitmentField': recruitmentField,
         'cvUrl': cvUrl,
         'cvFileName': _cvFileName,
         'submittedAt': FieldValue.serverTimestamp(),
@@ -552,7 +867,6 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
 
       _logger.i('✅ APPLICATION SUBMITTED SUCCESSFULLY');
 
-      // Save email locally to prevent re-submission
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('recruitment_email', email);
 
@@ -612,75 +926,76 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
                       ),
                       child: ConstrainedBox(
                         constraints: const BoxConstraints(maxWidth: 600),
-                        child: Form(
-                          key: _formKey,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              _buildInfoCard(),
-                              const SizedBox(height: 32),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            _buildInfoCard(),
+                            const SizedBox(height: 28),
 
-                              // Full Name
-                              _buildTextField(
-                                controller: _fullNameController,
-                                label: 'Full Name',
-                                hint: 'Enter your full name',
-                                icon: Icons.person_outline,
-                                validator: (v) {
-                                  if (v == null || v.trim().isEmpty) {
-                                    return 'Full name is required';
-                                  }
-                                  if (v.trim().length < 3) {
-                                    return 'Name must be at least 3 characters';
-                                  }
-                                  return null;
-                                },
+                            // ── Main application form ─────────────────────
+                            Form(
+                              key: _formKey,
+                              child: Column(
+                                crossAxisAlignment:
+                                    CrossAxisAlignment.stretch,
+                                children: [
+                                  // Full Name
+                                  _buildTextField(
+                                    controller: _fullNameController,
+                                    label: 'Full Name',
+                                    hint: 'Enter your full name',
+                                    icon: Icons.person_outline,
+                                    validator: (v) {
+                                      if (v == null || v.trim().isEmpty) {
+                                        return 'Full name is required';
+                                      }
+                                      if (v.trim().length < 3) {
+                                        return 'Name must be at least 3 characters';
+                                      }
+                                      return null;
+                                    },
+                                  ),
+
+                                  const SizedBox(height: 20),
+
+                                  // Email
+                                  _buildEmailField(),
+
+                                  const SizedBox(height: 20),
+
+                                  // Home County
+                                  _buildHomeCountyField(),
+
+                                  const SizedBox(height: 20),
+
+                                  // Recruitment Field Dropdown
+                                  _buildRecruitmentFieldDropdown(),
+
+                                  const SizedBox(height: 24),
+
+                                  // CV Upload
+                                  _buildCvUploadSection(),
+
+                                  const SizedBox(height: 24),
+
+                                  if (_errorMessage != null) ...[
+                                    _buildErrorMessage(),
+                                    const SizedBox(height: 20),
+                                  ],
+
+                                  _buildSubmitButton(isSmallScreen),
+
+                                  const SizedBox(height: 24),
+
+                                  _buildPrivacyNote(),
+
+                                  const SizedBox(height: 20),
+
+                                  _buildReturningUserLink(),
+                                ],
                               ),
-
-                              const SizedBox(height: 20),
-
-                              // Email
-                              _buildEmailField(),
-
-                              const SizedBox(height: 20),
-
-                              // Area of Expertise (new field)
-                              _buildTextField(
-                                controller: _areaOfExpertiseController,
-                                label: 'Area of Expertise',
-                                hint:
-                                    'e.g. Civil Engineering, Project Management',
-                                icon: Icons.workspace_premium_outlined,
-                                validator: (v) {
-                                  if (v == null || v.trim().isEmpty) {
-                                    return 'Please enter your area of expertise';
-                                  }
-                                  if (v.trim().length < 3) {
-                                    return 'Please provide a meaningful description';
-                                  }
-                                  return null;
-                                },
-                              ),
-
-                              const SizedBox(height: 24),
-
-                              // CV Upload
-                              _buildCvUploadSection(),
-
-                              const SizedBox(height: 24),
-
-                              if (_errorMessage != null) ...[
-                                _buildErrorMessage(),
-                                const SizedBox(height: 20),
-                              ],
-
-                              _buildSubmitButton(isSmallScreen),
-
-                              const SizedBox(height: 24),
-
-                              _buildPrivacyNote(),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
@@ -715,7 +1030,8 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
               borderRadius: BorderRadius.circular(12),
             ),
             child: IconButton(
-              icon: const Icon(Icons.arrow_back, color: Color(0xFF1A1A2E)),
+              icon:
+                  const Icon(Icons.arrow_back, color: Color(0xFF1A1A2E)),
               onPressed: () => Navigator.pop(context),
             ),
           ),
@@ -731,8 +1047,8 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
                         color: Color(0xFF1A1A2E))),
                 SizedBox(height: 2),
                 Text('Submit your application',
-                    style: TextStyle(
-                        fontSize: 14, color: Color(0xFF64748B))),
+                    style:
+                        TextStyle(fontSize: 14, color: Color(0xFF64748B))),
               ],
             ),
           ),
@@ -768,19 +1084,23 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
               color: Colors.white.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(16),
             ),
-            child: const Icon(Icons.work_outline, size: 32, color: Colors.white),
+            child: const Icon(Icons.work_outline,
+                size: 32, color: Colors.white),
           ),
           const SizedBox(height: 20),
           const Text(
             'Start Your Career Journey',
             style: TextStyle(
-                fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: Colors.white),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 12),
           const Text(
             'Fill in your details and upload your CV. One application per email address.',
-            style: TextStyle(fontSize: 15, color: Colors.white, height: 1.5),
+            style:
+                TextStyle(fontSize: 15, color: Colors.white, height: 1.5),
             textAlign: TextAlign.center,
           ),
         ],
@@ -788,13 +1108,44 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
     );
   }
 
-  /// Standard text field used for Full Name and Area of Expertise.
+  // ── Returning-user text link ─────────────────────────────────────────────
+
+  /// A small, unobtrusive link shown at the bottom of the form. Tapping it
+  /// opens the returning-user email check dialog.
+  Widget _buildReturningUserLink() {
+    return Center(
+      child: TextButton.icon(
+        onPressed: _showReturningUserDialog,
+        icon: const Icon(Icons.devices, size: 15, color: Color(0xFF7B2CBF)),
+        label: const Text(
+          'Already applied or using a new device?',
+          style: TextStyle(
+            fontSize: 13,
+            color: Color(0xFF7B2CBF),
+            fontWeight: FontWeight.w500,
+            decoration: TextDecoration.underline,
+            decorationColor: Color(0xFF7B2CBF),
+          ),
+        ),
+        style: TextButton.styleFrom(
+          padding:
+              const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        ),
+      ),
+    );
+  }
+
+  // ── Form field widgets ────────────────────────────────────────────────────
+
+  /// Standard text field used across the form.
   Widget _buildTextField({
     required TextEditingController controller,
     required String label,
     required String hint,
     required IconData icon,
     TextInputType? keyboardType,
+    TextCapitalization textCapitalization = TextCapitalization.none,
     required String? Function(String?) validator,
     bool readOnly = false,
   }) {
@@ -811,6 +1162,7 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
           controller: controller,
           keyboardType: keyboardType,
           readOnly: readOnly,
+          textCapitalization: textCapitalization,
           style: const TextStyle(color: Color(0xFF1A1A2E), fontSize: 15),
           decoration: InputDecoration(
             hintText: hint,
@@ -831,8 +1183,8 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
                     color: Color(0xFFE2E8F0), width: 1.5)),
             focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(
-                    color: Color(0xFF7B2CBF), width: 2)),
+                borderSide:
+                    const BorderSide(color: Color(0xFF7B2CBF), width: 2)),
             errorBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide: const BorderSide(
@@ -845,6 +1197,160 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
                 horizontal: 16, vertical: 16),
           ),
           validator: validator,
+        ),
+      ],
+    );
+  }
+
+  /// Home County text field — enforces word-capitalisation and validates format.
+  Widget _buildHomeCountyField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Home County',
+            style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF334155))),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: _homeCountyController,
+          keyboardType: TextInputType.text,
+          textCapitalization: TextCapitalization.words,
+          style: const TextStyle(color: Color(0xFF1A1A2E), fontSize: 15),
+          decoration: InputDecoration(
+            hintText: 'e.g. Nairobi, Mombasa, Kisumu',
+            hintStyle:
+                const TextStyle(color: Color(0xFF94A3B8), fontSize: 15),
+            prefixIcon: const Icon(Icons.location_on_outlined,
+                color: Color(0xFF64748B), size: 20),
+            filled: true,
+            fillColor: const Color(0xFFF8FAFC),
+            border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(
+                    color: Color(0xFFE2E8F0), width: 1.5)),
+            enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(
+                    color: Color(0xFFE2E8F0), width: 1.5)),
+            focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide:
+                    const BorderSide(color: Color(0xFF7B2CBF), width: 2)),
+            errorBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(
+                    color: Color(0xFFDC2626), width: 1.5)),
+            focusedErrorBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(
+                    color: Color(0xFFDC2626), width: 2)),
+            contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16, vertical: 16),
+          ),
+          validator: (value) {
+            if (value == null || value.trim().isEmpty) {
+              return 'Home county is required';
+            }
+            final trimmed = value.trim();
+            if (trimmed.length < 3) {
+              return 'Please enter a valid county name';
+            }
+            if (!RegExp(r'^[A-Z]').hasMatch(trimmed)) {
+              return 'County name must start with a capital letter';
+            }
+            if (!RegExp(r'^[A-Za-z\s\-]+$').hasMatch(trimmed)) {
+              return 'County name should contain letters only';
+            }
+            return null;
+          },
+        ),
+        const SizedBox(height: 6),
+        Row(
+          children: [
+            Icon(Icons.info_outline,
+                size: 13,
+                color: const Color(0xFF64748B).withValues(alpha: 0.8)),
+            const SizedBox(width: 6),
+            const Expanded(
+              child: Text(
+                'Please start with a capital letter, e.g. "Nairobi".',
+                style: TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF64748B),
+                    fontStyle: FontStyle.italic),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  /// Dropdown for selecting the Recruitment Field.
+  Widget _buildRecruitmentFieldDropdown() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Recruitment Field',
+            style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF334155))),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<String>(
+          initialValue: _selectedRecruitmentField,
+          isExpanded: true,
+          style: const TextStyle(color: Color(0xFF1A1A2E), fontSize: 15),
+          decoration: InputDecoration(
+            hintText: 'Select a field',
+            hintStyle:
+                const TextStyle(color: Color(0xFF94A3B8), fontSize: 15),
+            prefixIcon: const Icon(Icons.work_outline,
+                color: Color(0xFF64748B), size: 20),
+            filled: true,
+            fillColor: const Color(0xFFF8FAFC),
+            border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(
+                    color: Color(0xFFE2E8F0), width: 1.5)),
+            enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(
+                    color: Color(0xFFE2E8F0), width: 1.5)),
+            focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide:
+                    const BorderSide(color: Color(0xFF7B2CBF), width: 2)),
+            errorBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(
+                    color: Color(0xFFDC2626), width: 1.5)),
+            focusedErrorBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(
+                    color: Color(0xFFDC2626), width: 2)),
+            contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16, vertical: 16),
+          ),
+          items: _recruitmentFields.map((field) {
+            return DropdownMenuItem<String>(
+              value: field,
+              child: Text(field,
+                  style: const TextStyle(
+                      fontSize: 15, color: Color(0xFF1A1A2E))),
+            );
+          }).toList(),
+          onChanged: (value) {
+            setState(() => _selectedRecruitmentField = value);
+          },
+          validator: (value) {
+            if (value == null || value.isEmpty) {
+              return 'Please select a recruitment field';
+            }
+            return null;
+          },
         ),
       ],
     );
@@ -886,7 +1392,6 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
         TextFormField(
           controller: _emailController,
           keyboardType: TextInputType.emailAddress,
-          // Lock the field if the email was pulled from an active auth session
           readOnly: _emailPrefilledFromAuth,
           style: const TextStyle(color: Color(0xFF1A1A2E), fontSize: 15),
           decoration: InputDecoration(
@@ -916,8 +1421,8 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
                     width: 1.5)),
             focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(
-                    color: Color(0xFF7B2CBF), width: 2)),
+                borderSide:
+                    const BorderSide(color: Color(0xFF7B2CBF), width: 2)),
             errorBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide: const BorderSide(
@@ -1025,7 +1530,8 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
                 color: const Color(0xFF10B981).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                    color: const Color(0xFF10B981).withValues(alpha: 0.3)),
+                    color:
+                        const Color(0xFF10B981).withValues(alpha: 0.3)),
               ),
               child: Row(
                 children: [
@@ -1073,11 +1579,14 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
                       _isCheckingRegistered
                   ? null
                   : _selectCvFile,
-              icon: Icon(_cvFileName != null ? Icons.refresh : Icons.attach_file),
-              label: Text(_cvFileName != null ? 'Change CV' : 'Select CV File'),
+              icon: Icon(
+                  _cvFileName != null ? Icons.refresh : Icons.attach_file),
+              label: Text(
+                  _cvFileName != null ? 'Change CV' : 'Select CV File'),
               style: OutlinedButton.styleFrom(
                 foregroundColor: const Color(0xFF7B2CBF),
-                side: const BorderSide(color: Color(0xFF7B2CBF), width: 1.5),
+                side:
+                    const BorderSide(color: Color(0xFF7B2CBF), width: 1.5),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12)),
               ),
@@ -1135,8 +1644,8 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
           foregroundColor: Colors.white,
           disabledBackgroundColor: const Color(0xFFE2E8F0),
           disabledForegroundColor: const Color(0xFF94A3B8),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12)),
           elevation: 0,
         ),
         child: isLoading
@@ -1182,13 +1691,12 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
         border: Border.all(
             color: const Color(0xFF3B82F6).withValues(alpha: 0.1)),
       ),
-      child: Row(
+      child: const Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.lock_outline,
-              size: 18, color: Color(0xFF3B82F6)),
-          const SizedBox(width: 12),
-          const Expanded(
+          Icon(Icons.lock_outline, size: 18, color: Color(0xFF3B82F6)),
+          SizedBox(width: 12),
+          Expanded(
             child: Text(
               'Your information is secure and will only be used for recruitment purposes. One application per email address.',
               style: TextStyle(

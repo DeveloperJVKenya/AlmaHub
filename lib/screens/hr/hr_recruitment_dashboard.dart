@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
@@ -8,7 +10,8 @@ class HRRecruitmentDashboard extends StatefulWidget {
   const HRRecruitmentDashboard({super.key});
 
   @override
-  State<HRRecruitmentDashboard> createState() => _HRRecruitmentDashboardState();
+  State<HRRecruitmentDashboard> createState() =>
+      _HRRecruitmentDashboardState();
 }
 
 class _HRRecruitmentDashboardState extends State<HRRecruitmentDashboard> {
@@ -133,17 +136,31 @@ class _HRRecruitmentDashboardState extends State<HRRecruitmentDashboard> {
 
         final docs = snapshot.data!.docs;
         final total = docs.length;
-        final pending = docs.where((d) => (d.data() as Map)['status'] == 'pending').length;
-        final underReview = docs.where((d) => (d.data() as Map)['status'] == 'under_review').length;
-        final shortlisted = docs.where((d) => (d.data() as Map)['status'] == 'shortlisted').length;
-        final notShortlisted = docs.where((d) => (d.data() as Map)['status'] == 'not_shortlisted').length;
-        final accepted = docs.where((d) => (d.data() as Map)['status'] == 'accepted').length;
-        final rejected = docs.where((d) => (d.data() as Map)['status'] == 'rejected').length;
+        final pending = docs
+            .where((d) => (d.data() as Map)['status'] == 'pending')
+            .length;
+        final underReview = docs
+            .where((d) => (d.data() as Map)['status'] == 'under_review')
+            .length;
+        final shortlisted = docs
+            .where((d) => (d.data() as Map)['status'] == 'shortlisted')
+            .length;
+        final notShortlisted = docs
+            .where((d) => (d.data() as Map)['status'] == 'not_shortlisted')
+            .length;
+        final accepted = docs
+            .where((d) => (d.data() as Map)['status'] == 'accepted')
+            .length;
+        final rejected = docs
+            .where((d) => (d.data() as Map)['status'] == 'rejected')
+            .length;
 
         return LayoutBuilder(
           builder: (context, constraints) {
             final screenWidth = constraints.maxWidth;
-            final cardWidth = screenWidth * 0.15;
+            // clamp cardWidth so stat cards are always legible
+            final cardWidth =
+                (screenWidth * 0.15).clamp(90.0, double.infinity);
             final spacing = screenWidth * 0.015;
 
             return Container(
@@ -155,19 +172,26 @@ class _HRRecruitmentDashboardState extends State<HRRecruitmentDashboard> {
                 scrollDirection: Axis.horizontal,
                 child: Row(
                   children: [
-                    _buildStatCard('Total', total, const Color(0xFF7B2CBF), Icons.people, cardWidth),
+                    _buildStatCard('Total', total,
+                        const Color(0xFF7B2CBF), Icons.people, cardWidth),
                     SizedBox(width: spacing),
-                    _buildStatCard('Pending', pending, const Color(0xFF3B82F6), Icons.hourglass_empty, cardWidth),
+                    _buildStatCard('Pending', pending,
+                        const Color(0xFF3B82F6), Icons.hourglass_empty, cardWidth),
                     SizedBox(width: spacing),
-                    _buildStatCard('Reviewing', underReview, const Color(0xFFF59E0B), Icons.pending_actions, cardWidth),
+                    _buildStatCard('Reviewing', underReview,
+                        const Color(0xFFF59E0B), Icons.pending_actions, cardWidth),
                     SizedBox(width: spacing),
-                    _buildStatCard('Shortlisted', shortlisted, const Color(0xFF10B981), Icons.stars, cardWidth),
+                    _buildStatCard('Shortlisted', shortlisted,
+                        const Color(0xFF10B981), Icons.stars, cardWidth),
                     SizedBox(width: spacing),
-                    _buildStatCard('Not Shortlisted', notShortlisted, const Color(0xFFEF4444), Icons.info_outline, cardWidth),
+                    _buildStatCard('Not Shortlisted', notShortlisted,
+                        const Color(0xFFEF4444), Icons.info_outline, cardWidth),
                     SizedBox(width: spacing),
-                    _buildStatCard('Accepted', accepted, const Color(0xFF059669), Icons.check_circle, cardWidth),
+                    _buildStatCard('Accepted', accepted,
+                        const Color(0xFF059669), Icons.check_circle, cardWidth),
                     SizedBox(width: spacing),
-                    _buildStatCard('Rejected', rejected, const Color(0xFF6B7280), Icons.cancel, cardWidth),
+                    _buildStatCard('Rejected', rejected,
+                        const Color(0xFF6B7280), Icons.cancel, cardWidth),
                     SizedBox(width: spacing),
                     _buildFilterCard(cardWidth),
                   ],
@@ -180,10 +204,11 @@ class _HRRecruitmentDashboardState extends State<HRRecruitmentDashboard> {
     );
   }
 
-  Widget _buildStatCard(String title, int value, Color color, IconData icon, double cardWidth) {
-    final iconSize = (cardWidth * 0.12).clamp(18.0, 24.0);
-    final valueSize = (cardWidth * 0.10).clamp(16.0, 22.0);
-    final titleSize = (cardWidth * 0.065).clamp(11.0, 14.0);
+  Widget _buildStatCard(String title, int value, Color color, IconData icon,
+      double cardWidth) {
+    final iconSize = (cardWidth * 0.22).clamp(18.0, 24.0);
+    final valueSize = (cardWidth * 0.18).clamp(16.0, 22.0);
+    final titleSize = (cardWidth * 0.12).clamp(11.0, 14.0);
 
     return Container(
       width: cardWidth,
@@ -229,9 +254,15 @@ class _HRRecruitmentDashboardState extends State<HRRecruitmentDashboard> {
     );
   }
 
+  /// Filter card — uses isExpanded + a minimum width to prevent the
+  /// DropdownButtonFormField from overflowing its container.
   Widget _buildFilterCard(double cardWidth) {
+    // Ensure the filter card is always wide enough to show the longest item
+    // ("All Applications") plus the dropdown arrow without overflowing.
+    final filterCardWidth = math.max(cardWidth * 1.5, 170.0);
+
     return Container(
-      width: cardWidth * 1.2,
+      width: filterCardWidth,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -246,20 +277,29 @@ class _HRRecruitmentDashboardState extends State<HRRecruitmentDashboard> {
       ),
       child: DropdownButtonFormField<String>(
         initialValue: _statusFilter,
+        // ─── FIX: isExpanded lets the selected-value Row use all available
+        // horizontal space, preventing the "overflowed by N pixels" error. ──
+        isExpanded: true,
         decoration: const InputDecoration(
           labelText: 'Filter',
-          labelStyle: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+          labelStyle:
+              TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
           border: OutlineInputBorder(),
-          contentPadding: EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+          contentPadding:
+              EdgeInsets.symmetric(vertical: 8, horizontal: 12),
           isDense: true,
         ),
         style: const TextStyle(fontSize: 12, color: Colors.black87),
         items: const [
           DropdownMenuItem(value: 'all', child: Text('All Applications')),
-          DropdownMenuItem(value: 'pending', child: Text('Pending Review')),
-          DropdownMenuItem(value: 'under_review', child: Text('Under Review')),
-          DropdownMenuItem(value: 'shortlisted', child: Text('Shortlisted')),
-          DropdownMenuItem(value: 'not_shortlisted', child: Text('Not Shortlisted')),
+          DropdownMenuItem(
+              value: 'pending', child: Text('Pending Review')),
+          DropdownMenuItem(
+              value: 'under_review', child: Text('Under Review')),
+          DropdownMenuItem(
+              value: 'shortlisted', child: Text('Shortlisted')),
+          DropdownMenuItem(
+              value: 'not_shortlisted', child: Text('Not Shortlisted')),
           DropdownMenuItem(value: 'accepted', child: Text('Accepted')),
           DropdownMenuItem(value: 'rejected', child: Text('Rejected')),
         ],
@@ -300,26 +340,36 @@ class _HRRecruitmentDashboardState extends State<HRRecruitmentDashboard> {
                   stream: _getFilteredStream(),
                   builder: (context, snapshot) {
                     if (snapshot.hasError) {
-                      _logger.e('Error in stream', error: snapshot.error);
-                      return Center(child: Text('Error: ${snapshot.error}'));
+                      _logger.e('Error in stream',
+                          error: snapshot.error);
+                      return Center(
+                          child: Text('Error: ${snapshot.error}'));
                     }
 
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Center(child: CircularProgressIndicator());
+                    if (snapshot.connectionState ==
+                        ConnectionState.waiting) {
+                      return const Center(
+                          child: CircularProgressIndicator());
                     }
 
                     final allApplicants = snapshot.data!.docs;
-                    _logger.i('Loaded ${allApplicants.length} applicants');
+                    _logger.i(
+                        'Loaded ${allApplicants.length} applicants');
 
                     // Apply search filter
                     final applicants = _searchQuery.isEmpty
                         ? allApplicants
                         : allApplicants.where((doc) {
-                            final data = doc.data() as Map<String, dynamic>;
-                            final fullName = (data['fullName'] ?? '').toString().toLowerCase();
-                            final email = (data['email'] ?? '').toString().toLowerCase();
-                            
-                            return fullName.contains(_searchQuery) || email.contains(_searchQuery);
+                            final data =
+                                doc.data() as Map<String, dynamic>;
+                            final fullName = (data['fullName'] ?? '')
+                                .toString()
+                                .toLowerCase();
+                            final email = (data['email'] ?? '')
+                                .toString()
+                                .toLowerCase();
+                            return fullName.contains(_searchQuery) ||
+                                email.contains(_searchQuery);
                           }).toList();
 
                     if (applicants.isEmpty) {
@@ -328,7 +378,9 @@ class _HRRecruitmentDashboardState extends State<HRRecruitmentDashboard> {
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Icon(
-                              _searchQuery.isNotEmpty ? Icons.search_off : Icons.inbox,
+                              _searchQuery.isNotEmpty
+                                  ? Icons.search_off
+                                  : Icons.inbox,
                               size: 64,
                               color: Colors.grey.shade400,
                             ),
@@ -337,12 +389,14 @@ class _HRRecruitmentDashboardState extends State<HRRecruitmentDashboard> {
                               _searchQuery.isNotEmpty
                                   ? 'No results found for "$_searchQuery"'
                                   : 'No applications found',
-                              style: const TextStyle(fontSize: 16, color: Colors.grey),
+                              style: const TextStyle(
+                                  fontSize: 16, color: Colors.grey),
                             ),
                             if (_searchQuery.isNotEmpty) ...[
                               const SizedBox(height: 12),
                               TextButton.icon(
-                                onPressed: () => setState(() => _searchQuery = ''),
+                                onPressed: () =>
+                                    setState(() => _searchQuery = ''),
                                 icon: const Icon(Icons.clear),
                                 label: const Text('Clear Search'),
                               ),
@@ -358,10 +412,11 @@ class _HRRecruitmentDashboardState extends State<HRRecruitmentDashboard> {
                         scrollDirection: Axis.horizontal,
                         child: DataTable(
                           headingRowHeight: 50,
-                          dataRowMinHeight: 45,
-                          dataRowMaxHeight: 45,
-                          headingRowColor: WidgetStateProperty.all(Colors.grey.shade100),
-                          columnSpacing: 24,
+                          dataRowMinHeight: 52,
+                          dataRowMaxHeight: 52,
+                          headingRowColor: WidgetStateProperty.all(
+                              Colors.grey.shade100),
+                          columnSpacing: 20,
                           headingTextStyle: const TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 13,
@@ -375,6 +430,11 @@ class _HRRecruitmentDashboardState extends State<HRRecruitmentDashboard> {
                             DataColumn(label: Text('No.')),
                             DataColumn(label: Text('Full Name')),
                             DataColumn(label: Text('Email')),
+                            // ── New columns ──────────────────────────────
+                            DataColumn(
+                                label: Text('Recruitment Field')),
+                            DataColumn(label: Text('Home County')),
+                            // ────────────────────────────────────────────
                             DataColumn(label: Text('CV File')),
                             DataColumn(label: Text('Submitted')),
                             DataColumn(label: Text('Status')),
@@ -384,14 +444,15 @@ class _HRRecruitmentDashboardState extends State<HRRecruitmentDashboard> {
                           rows: applicants.asMap().entries.map((entry) {
                             final index = entry.key;
                             final doc = entry.value;
-                            final data = doc.data() as Map<String, dynamic>;
-                            
+                            final data =
+                                doc.data() as Map<String, dynamic>;
+
                             return DataRow(
                               cells: [
                                 DataCell(Text('${index + 1}')),
                                 DataCell(
                                   SizedBox(
-                                    width: 180,
+                                    width: 160,
                                     child: Text(
                                       data['fullName'] ?? '-',
                                       overflow: TextOverflow.ellipsis,
@@ -400,16 +461,47 @@ class _HRRecruitmentDashboardState extends State<HRRecruitmentDashboard> {
                                 ),
                                 DataCell(
                                   SizedBox(
-                                    width: 200,
+                                    width: 190,
                                     child: Text(
                                       data['email'] ?? '-',
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
                                 ),
+                                // Recruitment Field cell
                                 DataCell(
                                   SizedBox(
                                     width: 150,
+                                    child: _buildFieldBadge(
+                                        data['recruitmentField']),
+                                  ),
+                                ),
+                                // Home County cell
+                                DataCell(
+                                  SizedBox(
+                                    width: 120,
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(
+                                            Icons.location_on_outlined,
+                                            size: 14,
+                                            color: Color(0xFF64748B)),
+                                        const SizedBox(width: 4),
+                                        Flexible(
+                                          child: Text(
+                                            data['homeCounty'] ?? '-',
+                                            overflow:
+                                                TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                DataCell(
+                                  SizedBox(
+                                    width: 140,
                                     child: Text(
                                       data['cvFileName'] ?? '-',
                                       overflow: TextOverflow.ellipsis,
@@ -419,16 +511,20 @@ class _HRRecruitmentDashboardState extends State<HRRecruitmentDashboard> {
                                 DataCell(
                                   Text(
                                     data['submittedAt'] != null
-                                        ? DateFormat('dd/MM/yyyy HH:mm').format(
-                                            (data['submittedAt'] as Timestamp).toDate(),
+                                        ? DateFormat('dd/MM/yy HH:mm')
+                                            .format(
+                                            (data['submittedAt']
+                                                    as Timestamp)
+                                                .toDate(),
                                           )
                                         : '-',
                                   ),
                                 ),
-                                DataCell(_buildStatusBadge(data['status'] ?? 'pending')),
+                                DataCell(_buildStatusBadge(
+                                    data['status'] ?? 'pending')),
                                 DataCell(
                                   SizedBox(
-                                    width: 200,
+                                    width: 180,
                                     child: Text(
                                       data['reviewNotes'] ?? '-',
                                       overflow: TextOverflow.ellipsis,
@@ -517,7 +613,8 @@ class _HRRecruitmentDashboardState extends State<HRRecruitmentDashboard> {
             ),
           ),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
             decoration: BoxDecoration(
               color: Colors.white.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(8),
@@ -592,7 +689,7 @@ class _HRRecruitmentDashboardState extends State<HRRecruitmentDashboard> {
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
@@ -601,14 +698,17 @@ class _HRRecruitmentDashboardState extends State<HRRecruitmentDashboard> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 14, color: color),
-          const SizedBox(width: 6),
-          Text(
-            text,
-            style: TextStyle(
-              color: color,
-              fontWeight: FontWeight.w600,
-              fontSize: 12,
+          Icon(icon, size: 13, color: color),
+          const SizedBox(width: 5),
+          Flexible(
+            child: Text(
+              text,
+              style: TextStyle(
+                color: color,
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+              ),
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],
@@ -616,56 +716,111 @@ class _HRRecruitmentDashboardState extends State<HRRecruitmentDashboard> {
     );
   }
 
-  Widget _buildActionButtons(String docId, Map<String, dynamic> data) {
+  /// Badge for the Recruitment Field column.
+  Widget _buildFieldBadge(dynamic field) {
+    final label = (field as String?)?.trim() ?? '-';
+    if (label == '-') {
+      return Text(label,
+          style: const TextStyle(color: Colors.grey, fontSize: 13));
+    }
+
+    IconData icon;
+    Color color;
+    if (label.toLowerCase().contains('field officer')) {
+      icon = Icons.agriculture_outlined;
+      color = const Color(0xFF0EA5E9);
+    } else if (label.toLowerCase().contains('regional')) {
+      icon = Icons.map_outlined;
+      color = const Color(0xFF8B5CF6);
+    } else {
+      icon = Icons.work_outline;
+      color = const Color(0xFF64748B);
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.3), width: 1),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: color),
+          const SizedBox(width: 5),
+          Flexible(
+            child: Text(
+              label,
+              style: TextStyle(
+                  fontSize: 12,
+                  color: color,
+                  fontWeight: FontWeight.w600),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionButtons(
+      String docId, Map<String, dynamic> data) {
     final status = data['status'] ?? 'pending';
     final cvUrl = data['cvUrl'] as String?;
 
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        // View CV Button
         if (cvUrl != null)
           IconButton(
-            icon: const Icon(Icons.description, size: 20, color: Color(0xFF3B82F6)),
-            onPressed: () => _viewCV(cvUrl, data['cvFileName'] ?? 'CV'),
+            icon: const Icon(Icons.description,
+                size: 20, color: Color(0xFF3B82F6)),
+            onPressed: () =>
+                _viewCV(cvUrl, data['cvFileName'] ?? 'CV'),
             tooltip: 'View CV',
           ),
-
-        // Status Update Button
         IconButton(
-          icon: const Icon(Icons.edit_note, size: 20, color: Color(0xFFF59E0B)),
+          icon: const Icon(Icons.edit_note,
+              size: 20, color: Color(0xFFF59E0B)),
           onPressed: () => _updateStatus(docId, data),
           tooltip: 'Update Status',
         ),
-
-        // Quick Actions based on status
         if (status == 'pending') ...[
           IconButton(
-            icon: const Icon(Icons.rate_review, size: 20, color: Color(0xFF10B981)),
-            onPressed: () => _quickUpdateStatus(docId, 'under_review'),
+            icon: const Icon(Icons.rate_review,
+                size: 20, color: Color(0xFF10B981)),
+            onPressed: () =>
+                _quickUpdateStatus(docId, 'under_review'),
             tooltip: 'Start Review',
           ),
         ],
         if (status == 'under_review') ...[
           IconButton(
-            icon: const Icon(Icons.star, size: 20, color: Color(0xFF10B981)),
-            onPressed: () => _quickUpdateStatus(docId, 'shortlisted'),
+            icon: const Icon(Icons.star,
+                size: 20, color: Color(0xFF10B981)),
+            onPressed: () =>
+                _quickUpdateStatus(docId, 'shortlisted'),
             tooltip: 'Shortlist',
           ),
           IconButton(
-            icon: const Icon(Icons.block, size: 20, color: Color(0xFFEF4444)),
-            onPressed: () => _quickUpdateStatus(docId, 'not_shortlisted'),
+            icon: const Icon(Icons.block,
+                size: 20, color: Color(0xFFEF4444)),
+            onPressed: () =>
+                _quickUpdateStatus(docId, 'not_shortlisted'),
             tooltip: 'Not Shortlist',
           ),
         ],
         if (status == 'shortlisted') ...[
           IconButton(
-            icon: const Icon(Icons.check_circle, size: 20, color: Color(0xFF059669)),
+            icon: const Icon(Icons.check_circle,
+                size: 20, color: Color(0xFF059669)),
             onPressed: () => _quickUpdateStatus(docId, 'accepted'),
             tooltip: 'Accept',
           ),
           IconButton(
-            icon: const Icon(Icons.cancel, size: 20, color: Color(0xFF6B7280)),
+            icon: const Icon(Icons.cancel,
+                size: 20, color: Color(0xFF6B7280)),
             onPressed: () => _quickUpdateStatus(docId, 'rejected'),
             tooltip: 'Reject',
           ),
@@ -676,7 +831,6 @@ class _HRRecruitmentDashboardState extends State<HRRecruitmentDashboard> {
 
   Future<void> _viewCV(String cvUrl, String fileName) async {
     _logger.i('Opening CV: $fileName');
-    
     try {
       final uri = Uri.parse(cvUrl);
       if (await canLaunchUrl(uri)) {
@@ -686,7 +840,6 @@ class _HRRecruitmentDashboardState extends State<HRRecruitmentDashboard> {
       }
     } catch (e) {
       _logger.e('Error opening CV', error: e);
-      
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -698,29 +851,27 @@ class _HRRecruitmentDashboardState extends State<HRRecruitmentDashboard> {
     }
   }
 
-  Future<void> _quickUpdateStatus(String docId, String newStatus) async {
+  Future<void> _quickUpdateStatus(
+      String docId, String newStatus) async {
     _logger.i('Quick status update: $docId → $newStatus');
-    
     try {
       await _firestore.collection('Recruitees').doc(docId).update({
         'status': newStatus,
         'reviewedAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
       });
-      
       _logger.i('✅ Status updated successfully');
-      
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Status updated to: ${_getStatusLabel(newStatus)}'),
+            content: Text(
+                'Status updated to: ${_getStatusLabel(newStatus)}'),
             backgroundColor: Colors.green,
           ),
         );
       }
     } catch (e) {
       _logger.e('Error updating status', error: e);
-      
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -734,20 +885,20 @@ class _HRRecruitmentDashboardState extends State<HRRecruitmentDashboard> {
 
   void _updateStatus(String docId, Map<String, dynamic> data) {
     _logger.i('Opening status update dialog for: $docId');
-    
     final currentStatus = data['status'] ?? 'pending';
     String selectedStatus = currentStatus;
-    final notesController = TextEditingController(text: data['reviewNotes'] ?? '');
+    final notesController =
+        TextEditingController(text: data['reviewNotes'] ?? '');
 
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: Row(
+          title: const Row(
             children: [
-              const Icon(Icons.edit_note, color: Color(0xFF7B2CBF)),
-              const SizedBox(width: 12),
-              const Expanded(child: Text('Update Application Status')),
+              Icon(Icons.edit_note, color: Color(0xFF7B2CBF)),
+              SizedBox(width: 12),
+              Expanded(child: Text('Update Application Status')),
             ],
           ),
           content: SingleChildScrollView(
@@ -760,34 +911,45 @@ class _HRRecruitmentDashboardState extends State<HRRecruitmentDashboard> {
                   style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 16),
-                const Text(
-                  'Select Status',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                ),
+                const Text('Select Status',
+                    style: TextStyle(
+                        fontSize: 12, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
                   initialValue: selectedStatus,
+                  // isExpanded prevents overflow in the dialog too
+                  isExpanded: true,
                   decoration: const InputDecoration(
                     border: OutlineInputBorder(),
-                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    contentPadding: EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 8),
                   ),
                   items: const [
-                    DropdownMenuItem(value: 'pending', child: Text('Pending Review')),
-                    DropdownMenuItem(value: 'under_review', child: Text('Under Review')),
-                    DropdownMenuItem(value: 'shortlisted', child: Text('Shortlisted')),
-                    DropdownMenuItem(value: 'not_shortlisted', child: Text('Not Shortlisted')),
-                    DropdownMenuItem(value: 'accepted', child: Text('Accepted')),
-                    DropdownMenuItem(value: 'rejected', child: Text('Rejected')),
+                    DropdownMenuItem(
+                        value: 'pending',
+                        child: Text('Pending Review')),
+                    DropdownMenuItem(
+                        value: 'under_review',
+                        child: Text('Under Review')),
+                    DropdownMenuItem(
+                        value: 'shortlisted',
+                        child: Text('Shortlisted')),
+                    DropdownMenuItem(
+                        value: 'not_shortlisted',
+                        child: Text('Not Shortlisted')),
+                    DropdownMenuItem(
+                        value: 'accepted', child: Text('Accepted')),
+                    DropdownMenuItem(
+                        value: 'rejected', child: Text('Rejected')),
                   ],
                   onChanged: (value) {
                     setDialogState(() => selectedStatus = value!);
                   },
                 ),
                 const SizedBox(height: 16),
-                const Text(
-                  'Review Notes (Optional)',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                ),
+                const Text('Review Notes (Optional)',
+                    style: TextStyle(
+                        fontSize: 12, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 8),
                 TextField(
                   controller: notesController,
@@ -809,11 +971,11 @@ class _HRRecruitmentDashboardState extends State<HRRecruitmentDashboard> {
             ElevatedButton(
               onPressed: () async {
                 Navigator.pop(context);
-                await _performStatusUpdate(docId, selectedStatus, notesController.text.trim());
+                await _performStatusUpdate(docId, selectedStatus,
+                    notesController.text.trim());
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF7B2CBF),
-              ),
+                  backgroundColor: const Color(0xFF7B2CBF)),
               child: const Text('Update Status'),
             ),
           ],
@@ -822,28 +984,28 @@ class _HRRecruitmentDashboardState extends State<HRRecruitmentDashboard> {
     );
   }
 
-  Future<void> _performStatusUpdate(String docId, String newStatus, String notes) async {
+  Future<void> _performStatusUpdate(
+      String docId, String newStatus, String notes) async {
     _logger.i('Performing status update: $docId → $newStatus');
-    
     try {
       final updateData = <String, dynamic>{
         'status': newStatus,
         'reviewedAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
       };
-      
       if (notes.isNotEmpty) {
         updateData['reviewNotes'] = notes;
       }
-      
-      await _firestore.collection('Recruitees').doc(docId).update(updateData);
-      
+      await _firestore
+          .collection('Recruitees')
+          .doc(docId)
+          .update(updateData);
       _logger.i('✅ Status and notes updated successfully');
-      
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Application updated to: ${_getStatusLabel(newStatus)}'),
+            content: Text(
+                'Application updated to: ${_getStatusLabel(newStatus)}'),
             backgroundColor: Colors.green,
             duration: const Duration(seconds: 3),
           ),
@@ -851,7 +1013,6 @@ class _HRRecruitmentDashboardState extends State<HRRecruitmentDashboard> {
       }
     } catch (e) {
       _logger.e('Error updating application', error: e);
-      
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
