@@ -73,9 +73,10 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
       duration: const Duration(milliseconds: 1000),
       vsync: this,
     );
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _fadeController, curve: Curves.easeIn),
-    );
+    _fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _fadeController, curve: Curves.easeIn));
     _fadeController.forward();
 
     _prefillFromAuthUser();
@@ -110,7 +111,8 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
 
         if (doc.exists) {
           _logger.i(
-              'Existing application found — redirecting to status screen');
+            'Existing application found — redirecting to status screen',
+          );
           if (mounted) {
             Navigator.of(context).pushReplacement(
               MaterialPageRoute(
@@ -126,8 +128,11 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
         }
       }
     } catch (e, stackTrace) {
-      _logger.e('Error checking existing submission',
-          error: e, stackTrace: stackTrace);
+      _logger.e(
+        'Error checking existing submission',
+        error: e,
+        stackTrace: stackTrace,
+      );
     }
   }
 
@@ -200,7 +205,10 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
   }
 
   Future<String?> _uploadCvToStorage(
-      PlatformFile file, String fullName, String email) async {
+    PlatformFile file,
+    String fullName,
+    String email,
+  ) async {
     _logger.i('=== STARTING CV UPLOAD ===');
     try {
       setState(() => _isUploadingFile = true);
@@ -211,8 +219,9 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
       final fileName = '${sanitizedName}_$timestamp.$fileExtension';
       final contentType = _getContentType(fileExtension);
 
-      final storageRef =
-          FirebaseStorage.instance.ref().child('Recruitees/$fileName');
+      final storageRef = FirebaseStorage.instance.ref().child(
+        'Recruitees/$fileName',
+      );
 
       final metadata = SettableMetadata(
         contentType: contentType,
@@ -232,8 +241,7 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
     } on FirebaseException catch (e, stackTrace) {
       _logger.e('Firebase upload error', error: e, stackTrace: stackTrace);
       setState(() {
-        _errorMessage =
-            'Upload failed: ${e.message}\nError code: ${e.code}';
+        _errorMessage = 'Upload failed: ${e.message}\nError code: ${e.code}';
       });
       return null;
     } catch (e, stackTrace) {
@@ -277,13 +285,15 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
 
       if (usersQuery.docs.isNotEmpty) {
         _logger.w(
-            'Email found in Users collection doc: ${usersQuery.docs.first.id}');
+          'Email found in Users collection doc: ${usersQuery.docs.first.id}',
+        );
         return true;
       }
       _logger.d('Email not found in Users collection');
     } catch (e) {
       _logger.w(
-          'Error querying Users collection: $e — treating as unregistered');
+        'Error querying Users collection: $e — treating as unregistered',
+      );
     }
 
     return false;
@@ -308,7 +318,10 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
 
         if (mounted) {
           await _showExistingApplicationDialog(
-              fullName, status, sanitizedEmail);
+            fullName,
+            status,
+            sanitizedEmail,
+          );
         }
         return true;
       }
@@ -316,8 +329,11 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
       _logger.i('No existing application — can proceed');
       return false;
     } catch (e, stackTrace) {
-      _logger.e('Error checking existing application',
-          error: e, stackTrace: stackTrace);
+      _logger.e(
+        'Error checking existing application',
+        error: e,
+        stackTrace: stackTrace,
+      );
       return false;
     } finally {
       setState(() => _isCheckingExisting = false);
@@ -325,13 +341,15 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
   }
 
   Future<void> _showExistingApplicationDialog(
-      String fullName, String status, String sanitizedEmail) async {
+    String fullName,
+    String status,
+    String sanitizedEmail,
+  ) async {
     final statusMessages = {
       'pending': 'Your application is awaiting review',
       'under_review': 'Your application is currently being reviewed',
       'shortlisted': 'Congratulations! You\'ve been shortlisted',
-      'not_shortlisted':
-          'Your application was not shortlisted for this round',
+      'not_shortlisted': 'Your application was not shortlisted for this round',
       'accepted': 'Congratulations! Your application was accepted',
       'rejected': 'Your previous application was not selected',
     };
@@ -342,32 +360,35 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Row(
           children: [
-            const Icon(Icons.info_outline,
-                color: Color(0xFF7B2CBF), size: 28),
+            const Icon(Icons.info_outline, color: Color(0xFF7B2CBF), size: 28),
             const SizedBox(width: 12),
             const Expanded(
-                child: Text('Application Already Submitted',
-                    style: TextStyle(fontSize: 20))),
+              child: Text(
+                'Application Already Submitted',
+                style: TextStyle(fontSize: 20),
+              ),
+            ),
           ],
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Hi $fullName,',
-                style: const TextStyle(
-                    fontWeight: FontWeight.w600, fontSize: 16)),
+            Text(
+              'Hi $fullName,',
+              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+            ),
             const SizedBox(height: 12),
             const Text(
               'We found an existing application submitted with this email address.',
               style: TextStyle(
-                  fontSize: 15,
-                  color: Color(0xFF64748B),
-                  height: 1.5),
+                fontSize: 15,
+                color: Color(0xFF64748B),
+                height: 1.5,
+              ),
             ),
             const SizedBox(height: 16),
             Container(
@@ -376,28 +397,35 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
                 color: const Color(0xFF7B2CBF).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                    color:
-                        const Color(0xFF7B2CBF).withValues(alpha: 0.3)),
+                  color: const Color(0xFF7B2CBF).withValues(alpha: 0.3),
+                ),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.check_circle_outline,
-                      color: Color(0xFF7B2CBF), size: 20),
+                  const Icon(
+                    Icons.check_circle_outline,
+                    color: Color(0xFF7B2CBF),
+                    size: 20,
+                  ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: Text(message,
-                        style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF1A1A2E))),
+                    child: Text(
+                      message,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF1A1A2E),
+                      ),
+                    ),
                   ),
                 ],
               ),
             ),
             const SizedBox(height: 16),
-            const Text('Would you like to check your application status?',
-                style:
-                    TextStyle(fontSize: 14, color: Color(0xFF64748B))),
+            const Text(
+              'Would you like to check your application status?',
+              style: TextStyle(fontSize: 14, color: Color(0xFF64748B)),
+            ),
           ],
         ),
         actions: [
@@ -435,16 +463,13 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Row(
           children: [
-            const Icon(Icons.lock_outline,
-                color: Color(0xFF7B2CBF), size: 28),
+            const Icon(Icons.lock_outline, color: Color(0xFF7B2CBF), size: 28),
             const SizedBox(width: 12),
             const Expanded(
-              child:
-                  Text('Account Detected', style: TextStyle(fontSize: 20)),
+              child: Text('Account Detected', style: TextStyle(fontSize: 20)),
             ),
           ],
         ),
@@ -455,16 +480,18 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
             RichText(
               text: TextSpan(
                 style: const TextStyle(
-                    fontSize: 15,
-                    color: Color(0xFF475569),
-                    height: 1.5),
+                  fontSize: 15,
+                  color: Color(0xFF475569),
+                  height: 1.5,
+                ),
                 children: [
                   const TextSpan(text: 'The email address '),
                   TextSpan(
                     text: email,
                     style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF1A1A2E)),
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1A1A2E),
+                    ),
                   ),
                   const TextSpan(
                     text:
@@ -485,9 +512,9 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
             label: const Text('Sign In'),
             onPressed: () {
               Navigator.of(ctx).pop();
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const LoginScreen()),
-              );
+              Navigator.of(
+                context,
+              ).push(MaterialPageRoute(builder: (_) => const LoginScreen()));
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF7B2CBF),
@@ -513,7 +540,8 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
       builder: (dialogCtx) {
         // Local dialog state so we don't rebuild the whole screen.
         bool isChecking = false;
-        String? result; // null | 'invalid' | 'registered' | 'not_found' | 'error'
+        String?
+        result; // null | 'invalid' | 'registered' | 'not_found' | 'error'
 
         return StatefulBuilder(
           builder: (dialogCtx, setDialogState) {
@@ -548,30 +576,29 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
                     .doc(sanitizedEmail)
                     .get();
 
-                if (doc.exists) {
-                  _logger.i(
-                      'Dialog check: application found — navigating');
-                  final prefs = await SharedPreferences.getInstance();
-                  await prefs.setString('recruitment_email', email);
+                    if (doc.exists) {
+                      _logger.i('Dialog check: application found — navigating');
+                      final prefs = await SharedPreferences.getInstance();
+                      await prefs.setString('recruitment_email', email);
 
-                  if (mounted) {
-                    Navigator.of(dialogCtx).pop();
-                    Navigator.of(context).pushReplacement(
-                      MaterialPageRoute(
-                        builder: (_) => RecruitmentStatusScreen(
-                          recruiteeEmail: email,
-                          sanitizedEmail: sanitizedEmail,
-                        ),
-                      ),
-                    );
-                  }
-                } else {
+                      // ✅ Guard BOTH contexts before using them
+                      if (mounted && dialogCtx.mounted) {
+                        Navigator.of(dialogCtx).pop();
+                        Navigator.of(context).pushReplacement(
+                          MaterialPageRoute(
+                            builder: (_) => RecruitmentStatusScreen(
+                              recruiteeEmail: email,
+                              sanitizedEmail: sanitizedEmail,
+                            ),
+                          ),
+                        );
+                      }
+                    } else {
                   _logger.i('Dialog check: no application found');
                   setDialogState(() => result = 'not_found');
                 }
               } catch (e, st) {
-                _logger.e('Dialog email check error',
-                    error: e, stackTrace: st);
+                _logger.e('Dialog email check error', error: e, stackTrace: st);
                 setDialogState(() => result = 'error');
               } finally {
                 setDialogState(() => isChecking = false);
@@ -580,19 +607,22 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
 
             return AlertDialog(
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20)),
+                borderRadius: BorderRadius.circular(20),
+              ),
               title: Row(
                 children: [
                   Container(
                     width: 36,
                     height: 36,
                     decoration: BoxDecoration(
-                      color:
-                          const Color(0xFF7B2CBF).withValues(alpha: 0.1),
+                      color: const Color(0xFF7B2CBF).withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Icon(Icons.devices,
-                        color: Color(0xFF7B2CBF), size: 18),
+                    child: const Icon(
+                      Icons.devices,
+                      color: Color(0xFF7B2CBF),
+                      size: 18,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   const Expanded(
@@ -610,9 +640,10 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
                   const Text(
                     'Already applied or returning on a new device? Enter your email to retrieve your existing application.',
                     style: TextStyle(
-                        fontSize: 13,
-                        color: Color(0xFF64748B),
-                        height: 1.5),
+                      fontSize: 13,
+                      color: Color(0xFF64748B),
+                      height: 1.5,
+                    ),
                   ),
                   const SizedBox(height: 16),
                   TextField(
@@ -620,29 +651,47 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
                     keyboardType: TextInputType.emailAddress,
                     autofocus: true,
                     style: const TextStyle(
-                        fontSize: 15, color: Color(0xFF1A1A2E)),
+                      fontSize: 15,
+                      color: Color(0xFF1A1A2E),
+                    ),
                     decoration: InputDecoration(
                       hintText: 'you@example.com',
                       hintStyle: const TextStyle(
-                          color: Color(0xFF94A3B8), fontSize: 14),
-                      prefixIcon: const Icon(Icons.email_outlined,
-                          color: Color(0xFF64748B), size: 20),
+                        color: Color(0xFF94A3B8),
+                        fontSize: 14,
+                      ),
+                      prefixIcon: const Icon(
+                        Icons.email_outlined,
+                        color: Color(0xFF64748B),
+                        size: 20,
+                      ),
                       filled: true,
                       fillColor: const Color(0xFFF8FAFC),
                       border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(
-                              color: Color(0xFFE2E8F0), width: 1.5)),
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(
+                          color: Color(0xFFE2E8F0),
+                          width: 1.5,
+                        ),
+                      ),
                       enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(
-                              color: Color(0xFFE2E8F0), width: 1.5)),
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(
+                          color: Color(0xFFE2E8F0),
+                          width: 1.5,
+                        ),
+                      ),
                       focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(
-                              color: Color(0xFF7B2CBF), width: 2)),
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(
+                          color: Color(0xFF7B2CBF),
+                          width: 2,
+                        ),
+                      ),
                       contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 14),
+                        horizontal: 16,
+                        vertical: 14,
+                      ),
                     ),
                     onChanged: (_) {
                       if (result != null) {
@@ -671,19 +720,24 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
                     foregroundColor: Colors.white,
                     disabledBackgroundColor: const Color(0xFFE2E8F0),
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10)),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
                   child: isChecking
                       ? const SizedBox(
                           width: 18,
                           height: 18,
                           child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                  Colors.white)),
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Colors.white,
+                            ),
+                          ),
                         )
-                      : const Text('Check Status',
-                          style: TextStyle(fontWeight: FontWeight.w600)),
+                      : const Text(
+                          'Check Status',
+                          style: TextStyle(fontWeight: FontWeight.w600),
+                        ),
                 ),
               ],
             );
@@ -719,16 +773,20 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
         actionWidget = TextButton.icon(
           onPressed: () {
             Navigator.of(dialogCtx).pop();
-            Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const LoginScreen()));
+            Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (_) => const LoginScreen()));
           },
           icon: const Icon(Icons.login, size: 15),
-          label: const Text('Sign In',
-              style: TextStyle(fontWeight: FontWeight.w600)),
+          label: const Text(
+            'Sign In',
+            style: TextStyle(fontWeight: FontWeight.w600),
+          ),
           style: TextButton.styleFrom(
-              foregroundColor: const Color(0xFFEA580C),
-              padding: EdgeInsets.zero,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+            foregroundColor: const Color(0xFFEA580C),
+            padding: EdgeInsets.zero,
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
         );
         break;
       case 'not_found':
@@ -764,12 +822,15 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
               Icon(icon, color: textColor, size: 16),
               const SizedBox(width: 8),
               Expanded(
-                child: Text(message,
-                    style: TextStyle(
-                        color: textColor,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                        height: 1.4)),
+                child: Text(
+                  message,
+                  style: TextStyle(
+                    color: textColor,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    height: 1.4,
+                  ),
+                ),
               ),
             ],
           ),
@@ -793,15 +854,13 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
     }
 
     if (_selectedCvFile == null) {
-      setState(() =>
-          _errorMessage = 'Please upload your CV before submitting');
+      setState(() => _errorMessage = 'Please upload your CV before submitting');
       return;
     }
 
     if (_selectedRecruitmentField == null ||
         _selectedRecruitmentField!.isEmpty) {
-      setState(() =>
-          _errorMessage = 'Please select a recruitment field');
+      setState(() => _errorMessage = 'Please select a recruitment field');
       return;
     }
 
@@ -821,7 +880,8 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
 
     if (registered) {
       _logger.w(
-          'Email $email is registered — blocking submission, showing login prompt');
+        'Email $email is registered — blocking submission, showing login prompt',
+      );
       if (mounted) await _showRegisteredEmailDialog(email);
       return;
     }
@@ -842,8 +902,7 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
     _logger.i('Submitting application for: $fullName ($email)');
 
     try {
-      final cvUrl =
-          await _uploadCvToStorage(_selectedCvFile!, fullName, email);
+      final cvUrl = await _uploadCvToStorage(_selectedCvFile!, fullName, email);
       if (cvUrl == null) {
         _logger.e('CV upload failed — aborting');
         return;
@@ -886,15 +945,21 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
         );
       }
     } on FirebaseException catch (e, stackTrace) {
-      _logger.e('Firebase error during submission',
-          error: e, stackTrace: stackTrace);
+      _logger.e(
+        'Firebase error during submission',
+        error: e,
+        stackTrace: stackTrace,
+      );
       setState(() {
         _errorMessage =
             'Failed to submit application. Please try again.\nError: ${e.message}';
       });
     } catch (e, stackTrace) {
-      _logger.e('Unexpected error during submission',
-          error: e, stackTrace: stackTrace);
+      _logger.e(
+        'Unexpected error during submission',
+        error: e,
+        stackTrace: stackTrace,
+      );
       setState(() {
         _errorMessage =
             'An unexpected error occurred. Please try again.\nError: ${e.toString()}';
@@ -940,8 +1005,7 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
                             Form(
                               key: _formKey,
                               child: Column(
-                                crossAxisAlignment:
-                                    CrossAxisAlignment.stretch,
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
                                   // Full Name
                                   _buildTextField(
@@ -1034,8 +1098,7 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
               borderRadius: BorderRadius.circular(12),
             ),
             child: IconButton(
-              icon:
-                  const Icon(Icons.arrow_back, color: Color(0xFF1A1A2E)),
+              icon: const Icon(Icons.arrow_back, color: Color(0xFF1A1A2E)),
               onPressed: () => Navigator.pop(context),
             ),
           ),
@@ -1044,15 +1107,19 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Join Our Team',
-                    style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF1A1A2E))),
+                Text(
+                  'Join Our Team',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1A1A2E),
+                  ),
+                ),
                 SizedBox(height: 2),
-                Text('Submit your application',
-                    style:
-                        TextStyle(fontSize: 14, color: Color(0xFF64748B))),
+                Text(
+                  'Submit your application',
+                  style: TextStyle(fontSize: 14, color: Color(0xFF64748B)),
+                ),
               ],
             ),
           ),
@@ -1088,23 +1155,26 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
               color: Colors.white.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(16),
             ),
-            child: const Icon(Icons.work_outline,
-                size: 32, color: Colors.white),
+            child: const Icon(
+              Icons.work_outline,
+              size: 32,
+              color: Colors.white,
+            ),
           ),
           const SizedBox(height: 20),
           const Text(
             'Start Your Career Journey',
             style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-                color: Colors.white),
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 12),
           const Text(
             'Fill in your details and upload your CV. One application per email address.',
-            style:
-                TextStyle(fontSize: 15, color: Colors.white, height: 1.5),
+            style: TextStyle(fontSize: 15, color: Colors.white, height: 1.5),
             textAlign: TextAlign.center,
           ),
         ],
@@ -1132,8 +1202,7 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
           ),
         ),
         style: TextButton.styleFrom(
-          padding:
-              const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
         ),
       ),
@@ -1156,11 +1225,14 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label,
-            style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF334155))),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF334155),
+          ),
+        ),
         const SizedBox(height: 8),
         TextFormField(
           controller: controller,
@@ -1170,35 +1242,45 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
           style: const TextStyle(color: Color(0xFF1A1A2E), fontSize: 15),
           decoration: InputDecoration(
             hintText: hint,
-            hintStyle:
-                const TextStyle(color: Color(0xFF94A3B8), fontSize: 15),
-            prefixIcon:
-                Icon(icon, color: const Color(0xFF64748B), size: 20),
+            hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 15),
+            prefixIcon: Icon(icon, color: const Color(0xFF64748B), size: 20),
             filled: true,
-            fillColor:
-                readOnly ? const Color(0xFFEEF2FF) : const Color(0xFFF8FAFC),
+            fillColor: readOnly
+                ? const Color(0xFFEEF2FF)
+                : const Color(0xFFF8FAFC),
             border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(
-                    color: Color(0xFFE2E8F0), width: 1.5)),
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(
+                color: Color(0xFFE2E8F0),
+                width: 1.5,
+              ),
+            ),
             enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(
-                    color: Color(0xFFE2E8F0), width: 1.5)),
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(
+                color: Color(0xFFE2E8F0),
+                width: 1.5,
+              ),
+            ),
             focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide:
-                    const BorderSide(color: Color(0xFF7B2CBF), width: 2)),
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFF7B2CBF), width: 2),
+            ),
             errorBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(
-                    color: Color(0xFFDC2626), width: 1.5)),
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(
+                color: Color(0xFFDC2626),
+                width: 1.5,
+              ),
+            ),
             focusedErrorBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(
-                    color: Color(0xFFDC2626), width: 2)),
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFDC2626), width: 2),
+            ),
             contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16, vertical: 16),
+              horizontal: 16,
+              vertical: 16,
+            ),
           ),
           validator: validator,
         ),
@@ -1211,11 +1293,14 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Home County',
-            style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF334155))),
+        const Text(
+          'Home County',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF334155),
+          ),
+        ),
         const SizedBox(height: 8),
         TextFormField(
           controller: _homeCountyController,
@@ -1224,34 +1309,47 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
           style: const TextStyle(color: Color(0xFF1A1A2E), fontSize: 15),
           decoration: InputDecoration(
             hintText: 'e.g. Nairobi, Mombasa, Kisumu',
-            hintStyle:
-                const TextStyle(color: Color(0xFF94A3B8), fontSize: 15),
-            prefixIcon: const Icon(Icons.location_on_outlined,
-                color: Color(0xFF64748B), size: 20),
+            hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 15),
+            prefixIcon: const Icon(
+              Icons.location_on_outlined,
+              color: Color(0xFF64748B),
+              size: 20,
+            ),
             filled: true,
             fillColor: const Color(0xFFF8FAFC),
             border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(
-                    color: Color(0xFFE2E8F0), width: 1.5)),
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(
+                color: Color(0xFFE2E8F0),
+                width: 1.5,
+              ),
+            ),
             enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(
-                    color: Color(0xFFE2E8F0), width: 1.5)),
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(
+                color: Color(0xFFE2E8F0),
+                width: 1.5,
+              ),
+            ),
             focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide:
-                    const BorderSide(color: Color(0xFF7B2CBF), width: 2)),
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFF7B2CBF), width: 2),
+            ),
             errorBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(
-                    color: Color(0xFFDC2626), width: 1.5)),
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(
+                color: Color(0xFFDC2626),
+                width: 1.5,
+              ),
+            ),
             focusedErrorBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(
-                    color: Color(0xFFDC2626), width: 2)),
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFDC2626), width: 2),
+            ),
             contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16, vertical: 16),
+              horizontal: 16,
+              vertical: 16,
+            ),
           ),
           validator: (value) {
             if (value == null || value.trim().isEmpty) {
@@ -1273,17 +1371,20 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
         const SizedBox(height: 6),
         Row(
           children: [
-            Icon(Icons.info_outline,
-                size: 13,
-                color: const Color(0xFF64748B).withValues(alpha: 0.8)),
+            Icon(
+              Icons.info_outline,
+              size: 13,
+              color: const Color(0xFF64748B).withValues(alpha: 0.8),
+            ),
             const SizedBox(width: 6),
             const Expanded(
               child: Text(
                 'Please start with a capital letter, e.g. "Nairobi".',
                 style: TextStyle(
-                    fontSize: 12,
-                    color: Color(0xFF64748B),
-                    fontStyle: FontStyle.italic),
+                  fontSize: 12,
+                  color: Color(0xFF64748B),
+                  fontStyle: FontStyle.italic,
+                ),
               ),
             ),
           ],
@@ -1297,11 +1398,14 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Recruitment Field',
-            style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF334155))),
+        const Text(
+          'Recruitment Field',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF334155),
+          ),
+        ),
         const SizedBox(height: 8),
         DropdownButtonFormField<String>(
           initialValue: _selectedRecruitmentField,
@@ -1309,41 +1413,55 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
           style: const TextStyle(color: Color(0xFF1A1A2E), fontSize: 15),
           decoration: InputDecoration(
             hintText: 'Select a field',
-            hintStyle:
-                const TextStyle(color: Color(0xFF94A3B8), fontSize: 15),
-            prefixIcon: const Icon(Icons.work_outline,
-                color: Color(0xFF64748B), size: 20),
+            hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 15),
+            prefixIcon: const Icon(
+              Icons.work_outline,
+              color: Color(0xFF64748B),
+              size: 20,
+            ),
             filled: true,
             fillColor: const Color(0xFFF8FAFC),
             border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(
-                    color: Color(0xFFE2E8F0), width: 1.5)),
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(
+                color: Color(0xFFE2E8F0),
+                width: 1.5,
+              ),
+            ),
             enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(
-                    color: Color(0xFFE2E8F0), width: 1.5)),
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(
+                color: Color(0xFFE2E8F0),
+                width: 1.5,
+              ),
+            ),
             focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide:
-                    const BorderSide(color: Color(0xFF7B2CBF), width: 2)),
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFF7B2CBF), width: 2),
+            ),
             errorBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(
-                    color: Color(0xFFDC2626), width: 1.5)),
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(
+                color: Color(0xFFDC2626),
+                width: 1.5,
+              ),
+            ),
             focusedErrorBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(
-                    color: Color(0xFFDC2626), width: 2)),
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFDC2626), width: 2),
+            ),
             contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16, vertical: 16),
+              horizontal: 16,
+              vertical: 16,
+            ),
           ),
           items: _recruitmentFields.map((field) {
             return DropdownMenuItem<String>(
               value: field,
-              child: Text(field,
-                  style: const TextStyle(
-                      fontSize: 15, color: Color(0xFF1A1A2E))),
+              child: Text(
+                field,
+                style: const TextStyle(fontSize: 15, color: Color(0xFF1A1A2E)),
+              ),
             );
           }).toList(),
           onChanged: (value) {
@@ -1367,16 +1485,18 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
       children: [
         Row(
           children: [
-            const Text('Email Address',
-                style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF334155))),
+            const Text(
+              'Email Address',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF334155),
+              ),
+            ),
             if (_emailPrefilledFromAuth) ...[
               const SizedBox(width: 8),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
                   color: const Color(0xFF7B2CBF).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
@@ -1384,9 +1504,10 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
                 child: const Text(
                   'Auto-detected',
                   style: TextStyle(
-                      fontSize: 11,
-                      color: Color(0xFF7B2CBF),
-                      fontWeight: FontWeight.w600),
+                    fontSize: 11,
+                    color: Color(0xFF7B2CBF),
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ],
@@ -1400,43 +1521,58 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
           style: const TextStyle(color: Color(0xFF1A1A2E), fontSize: 15),
           decoration: InputDecoration(
             hintText: 'you@example.com',
-            hintStyle:
-                const TextStyle(color: Color(0xFF94A3B8), fontSize: 15),
-            prefixIcon: const Icon(Icons.email_outlined,
-                color: Color(0xFF64748B), size: 20),
+            hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 15),
+            prefixIcon: const Icon(
+              Icons.email_outlined,
+              color: Color(0xFF64748B),
+              size: 20,
+            ),
             suffixIcon: _emailPrefilledFromAuth
-                ? const Icon(Icons.lock_outline,
-                    color: Color(0xFF7B2CBF), size: 20)
+                ? const Icon(
+                    Icons.lock_outline,
+                    color: Color(0xFF7B2CBF),
+                    size: 20,
+                  )
                 : null,
             filled: true,
             fillColor: _emailPrefilledFromAuth
                 ? const Color(0xFFEEF2FF)
                 : const Color(0xFFF8FAFC),
             border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(
-                    color: Color(0xFFE2E8F0), width: 1.5)),
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(
+                color: Color(0xFFE2E8F0),
+                width: 1.5,
+              ),
+            ),
             enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(
-                    color: _emailPrefilledFromAuth
-                        ? const Color(0xFF7B2CBF).withValues(alpha: 0.4)
-                        : const Color(0xFFE2E8F0),
-                    width: 1.5)),
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(
+                color: _emailPrefilledFromAuth
+                    ? const Color(0xFF7B2CBF).withValues(alpha: 0.4)
+                    : const Color(0xFFE2E8F0),
+                width: 1.5,
+              ),
+            ),
             focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide:
-                    const BorderSide(color: Color(0xFF7B2CBF), width: 2)),
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFF7B2CBF), width: 2),
+            ),
             errorBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(
-                    color: Color(0xFFDC2626), width: 1.5)),
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(
+                color: Color(0xFFDC2626),
+                width: 1.5,
+              ),
+            ),
             focusedErrorBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(
-                    color: Color(0xFFDC2626), width: 2)),
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFDC2626), width: 2),
+            ),
             contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16, vertical: 16),
+              horizontal: 16,
+              vertical: 16,
+            ),
           ),
           validator: (value) {
             if (value == null || value.isEmpty) {
@@ -1452,17 +1588,20 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
           const SizedBox(height: 6),
           Row(
             children: [
-              Icon(Icons.info_outline,
-                  size: 13,
-                  color: const Color(0xFF64748B).withValues(alpha: 0.8)),
+              Icon(
+                Icons.info_outline,
+                size: 13,
+                color: const Color(0xFF64748B).withValues(alpha: 0.8),
+              ),
               const SizedBox(width: 6),
               const Expanded(
                 child: Text(
                   'This is the email associated with your current session.',
                   style: TextStyle(
-                      fontSize: 12,
-                      color: Color(0xFF64748B),
-                      fontStyle: FontStyle.italic),
+                    fontSize: 12,
+                    color: Color(0xFF64748B),
+                    fontStyle: FontStyle.italic,
+                  ),
                 ),
               ),
             ],
@@ -1504,23 +1643,30 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
                   color: const Color(0xFF7B2CBF).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(Icons.upload_file,
-                    color: Color(0xFF7B2CBF), size: 24),
+                child: const Icon(
+                  Icons.upload_file,
+                  color: Color(0xFF7B2CBF),
+                  size: 24,
+                ),
               ),
               const SizedBox(width: 14),
               const Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Upload Your CV',
-                        style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF1A1A2E))),
+                    Text(
+                      'Upload Your CV',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1A1A2E),
+                      ),
+                    ),
                     SizedBox(height: 4),
-                    Text('PDF, DOC, or DOCX (Max 10 MB)',
-                        style: TextStyle(
-                            fontSize: 12, color: Color(0xFF64748B))),
+                    Text(
+                      'PDF, DOC, or DOCX (Max 10 MB)',
+                      style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                    ),
                   ],
                 ),
               ),
@@ -1534,34 +1680,47 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
                 color: const Color(0xFF10B981).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                    color:
-                        const Color(0xFF10B981).withValues(alpha: 0.3)),
+                  color: const Color(0xFF10B981).withValues(alpha: 0.3),
+                ),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.check_circle,
-                      color: Color(0xFF10B981), size: 20),
+                  const Icon(
+                    Icons.check_circle,
+                    color: Color(0xFF10B981),
+                    size: 20,
+                  ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('File Selected',
-                            style: TextStyle(
-                                color: Color(0xFF10B981),
-                                fontWeight: FontWeight.w600,
-                                fontSize: 13)),
+                        const Text(
+                          'File Selected',
+                          style: TextStyle(
+                            color: Color(0xFF10B981),
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                          ),
+                        ),
                         const SizedBox(height: 2),
-                        Text(_cvFileName!,
-                            style: const TextStyle(
-                                color: Color(0xFF64748B), fontSize: 12),
-                            overflow: TextOverflow.ellipsis),
+                        Text(
+                          _cvFileName!,
+                          style: const TextStyle(
+                            color: Color(0xFF64748B),
+                            fontSize: 12,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ],
                     ),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.close,
-                        color: Color(0xFF64748B), size: 20),
+                    icon: const Icon(
+                      Icons.close,
+                      color: Color(0xFF64748B),
+                      size: 20,
+                    ),
                     onPressed: () {
                       setState(() {
                         _selectedCvFile = null;
@@ -1577,22 +1736,23 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
           SizedBox(
             height: 48,
             child: OutlinedButton.icon(
-              onPressed: _isUploadingFile ||
+              onPressed:
+                  _isUploadingFile ||
                       _isSubmitting ||
                       _isCheckingExisting ||
                       _isCheckingRegistered
                   ? null
                   : _selectCvFile,
               icon: Icon(
-                  _cvFileName != null ? Icons.refresh : Icons.attach_file),
-              label: Text(
-                  _cvFileName != null ? 'Change CV' : 'Select CV File'),
+                _cvFileName != null ? Icons.refresh : Icons.attach_file,
+              ),
+              label: Text(_cvFileName != null ? 'Change CV' : 'Select CV File'),
               style: OutlinedButton.styleFrom(
                 foregroundColor: const Color(0xFF7B2CBF),
-                side:
-                    const BorderSide(color: Color(0xFF7B2CBF), width: 1.5),
+                side: const BorderSide(color: Color(0xFF7B2CBF), width: 1.5),
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
             ),
           ),
@@ -1612,15 +1772,17 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.error_outline,
-              color: Color(0xFFDC2626), size: 20),
+          const Icon(Icons.error_outline, color: Color(0xFFDC2626), size: 20),
           const SizedBox(width: 10),
           Expanded(
-            child: Text(_errorMessage!,
-                style: const TextStyle(
-                    color: Color(0xFFDC2626),
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500)),
+            child: Text(
+              _errorMessage!,
+              style: const TextStyle(
+                color: Color(0xFFDC2626),
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
           ),
         ],
       ),
@@ -1628,7 +1790,8 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
   }
 
   Widget _buildSubmitButton(bool isSmallScreen) {
-    final isLoading = _isSubmitting ||
+    final isLoading =
+        _isSubmitting ||
         _isUploadingFile ||
         _isCheckingExisting ||
         _isCheckingRegistered;
@@ -1649,7 +1812,8 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
           disabledBackgroundColor: const Color(0xFFE2E8F0),
           disabledForegroundColor: const Color(0xFF94A3B8),
           shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12)),
+            borderRadius: BorderRadius.circular(12),
+          ),
           elevation: 0,
         ),
         child: isLoading
@@ -1660,14 +1824,18 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
                     height: 20,
                     width: 20,
                     child: CircularProgressIndicator(
-                        strokeWidth: 2.5,
-                        valueColor:
-                            AlwaysStoppedAnimation<Color>(Colors.white)),
+                      strokeWidth: 2.5,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
                   ),
                   const SizedBox(width: 16),
-                  Text(loadingLabel,
-                      style: const TextStyle(
-                          fontSize: 16, fontWeight: FontWeight.w600)),
+                  Text(
+                    loadingLabel,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ],
               )
             : const Row(
@@ -1675,11 +1843,14 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
                 children: [
                   Icon(Icons.send, size: 20),
                   SizedBox(width: 12),
-                  Text('Submit Application',
-                      style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 0.3)),
+                  Text(
+                    'Submit Application',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
                 ],
               ),
       ),
@@ -1693,7 +1864,8 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
         color: const Color(0xFF3B82F6).withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-            color: const Color(0xFF3B82F6).withValues(alpha: 0.1)),
+          color: const Color(0xFF3B82F6).withValues(alpha: 0.1),
+        ),
       ),
       child: const Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1704,7 +1876,10 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
             child: Text(
               'Your information is secure and will only be used for recruitment purposes. One application per email address.',
               style: TextStyle(
-                  fontSize: 12, color: Color(0xFF475569), height: 1.4),
+                fontSize: 12,
+                color: Color(0xFF475569),
+                height: 1.4,
+              ),
             ),
           ),
         ],
