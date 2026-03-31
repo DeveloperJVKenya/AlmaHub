@@ -1,4 +1,5 @@
 import 'package:almahub/screens/recruitment/recruitment_portal_screen.dart';
+//import 'package:almahub/screens/authentication/registration_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';
 
@@ -92,6 +93,23 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
+      // ── ADMIN FAB — remove when done ────────────────────────
+      /*floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const RegistrationScreen()),
+          );
+        },
+        backgroundColor: const Color(0xFF7B2CBF),
+        icon: const Icon(Icons.app_registration, color: Colors.white),
+        label: const Text(
+          'Register [TEST]',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+      ),
+      // ───────────────────────────────────────────────────────
+      */
       body: SafeArea(
         child: Stack(
           children: [

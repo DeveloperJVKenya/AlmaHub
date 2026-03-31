@@ -22,6 +22,10 @@ class _RecruitmentPortalScreenState extends State<RecruitmentPortalScreen>
   static const List<String> _recruitmentFields = [
     'Field Officer',
     'Regional Co-ordinator',
+    'ICT Officer',
+    'Crop Production Coordinator',
+    'Carbon Credit Lead',
+    'Certification Officer/Expert',
   ];
 
   final _formKey = GlobalKey<FormState>();
