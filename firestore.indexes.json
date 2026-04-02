@@ -1,21 +1,15 @@
 {
   "indexes": [
     {
-      "collectionGroup": "Draft",
+      "collectionGroup": "Recruitees",
       "queryScope": "COLLECTION",
       "fields": [
         {
-          "fieldPath": "createdAt",
-          "order": "DESCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "EmployeeDetails",
-      "queryScope": "COLLECTION",
-      "fields": [
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
         {
-          "fieldPath": "createdAt",
+          "fieldPath": "submittedAt",
           "order": "DESCENDING"
         }
       ]
