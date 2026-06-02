@@ -5,10 +5,10 @@ import 'package:almahub/screens/hr/step2_employment_details.dart';
 import 'package:almahub/screens/hr/step3_statutory_docs.dart';
 import 'package:almahub/screens/hr/step4_payroll_details.dart';
 // step4 academic (now used as step 5) — same import fix needed
-import 'package:almahub/screens/hr/step4_academic_docs.dart';
-import 'package:almahub/screens/hr/step5_contracts_forms.dart';
-import 'package:almahub/screens/hr/step6_benefits_insurance.dart';
-import 'package:almahub/screens/hr/step7_work_tools.dart';
+import 'package:almahub/screens/hr/step5_academic_docs.dart';
+import 'package:almahub/screens/hr/step6_contracts_forms.dart';
+import 'package:almahub/screens/hr/step7_benefits_insurance.dart';
+import 'package:almahub/screens/hr/step8_work_tools.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -1108,8 +1108,8 @@ class _HREmployeeOnboardingScreenState
           onChanged: (updated) => setState(() => _payrollDetails = updated),
         );
       case 4:
-        // Step 5 — Academic & Professional Documents (class = Step4AcademicDocs)
-        return Step4AcademicDocs(
+        // Step 5 — Academic & Professional Documents 
+        return Step5AcademicDocs(
           formKey: _formKeys[4],
           academicDocs: _academicDocs,
           isUploadingFile: _isUploadingFile,
@@ -1118,8 +1118,8 @@ class _HREmployeeOnboardingScreenState
           onUpload: _handleUpload,
         );
       case 5:
-        // Step 6 — Contracts & HR Forms (class = Step5ContractsForms)
-        return Step5ContractsForms(
+        // Step 6 — Contracts & HR Forms 
+        return Step6ContractsForms(
           formKey: _formKeys[5],
           contractsForms: _contractsForms,
           isUploadingFile: _isUploadingFile,
@@ -1127,8 +1127,8 @@ class _HREmployeeOnboardingScreenState
           onUpload: _handleUpload,
         );
       case 6:
-        // Step 7 — Benefits & Insurance (class = Step6BenefitsInsurance)
-        return Step6BenefitsInsurance(
+        // Step 7 — Benefits & Insurance 
+        return Step7BenefitsInsurance(
           formKey: _formKeys[6],
           benefitsInsurance: _benefitsInsurance,
           isUploadingFile: _isUploadingFile,
@@ -1137,8 +1137,8 @@ class _HREmployeeOnboardingScreenState
           onUpload: _handleUpload,
         );
       case 7:
-        // Step 8 — Work Tools & System Access (class = Step7WorkTools)
-        return Step7WorkTools(
+        // Step 8 — Work Tools & System Access 
+        return Step8WorkTools(
           formKey: _formKeys[7],
           workTools: _workTools,
           onChanged: (updated) => setState(() => _workTools = updated),

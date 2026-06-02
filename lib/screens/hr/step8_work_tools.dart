@@ -3,19 +3,19 @@ import 'package:almahub/screens/hr/onboarding_shared_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
-/// Step 7 — Work Tools & System Access
+/// Step 8 — Work Tools & System Access
 ///
 /// Captured by HR/IT to track what has been provisioned for the new employee:
 ///   • Work e-mail address
 ///   • HRIS / Payroll system profile status
 ///   • Internal system access status
 ///   • Issued equipment (laptops, phones, PPE, etc.)
-class Step7WorkTools extends StatelessWidget {
+class Step8WorkTools extends StatelessWidget {
   final GlobalKey<FormState> formKey;
   final WorkToolsAccess workTools;
   final void Function(WorkToolsAccess updated) onChanged;
 
-  const Step7WorkTools({
+  const Step8WorkTools({
     super.key,
     required this.formKey,
     required this.workTools,

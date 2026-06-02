@@ -3,8 +3,8 @@ import 'package:almahub/screens/hr/onboarding_shared_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
-/// Step 6 — Benefits & Insurance
-class Step6BenefitsInsurance extends StatelessWidget {
+/// Step 7 — Benefits & Insurance
+class Step7BenefitsInsurance extends StatelessWidget {
   final GlobalKey<FormState> formKey;
   final BenefitsInsurance benefitsInsurance;
   final bool isUploadingFile;
@@ -14,7 +14,7 @@ class Step6BenefitsInsurance extends StatelessWidget {
     void Function(String url) onSuccess,
   ) onUpload;
 
-  const Step6BenefitsInsurance({
+  const Step7BenefitsInsurance({
     super.key,
     required this.formKey,
     required this.benefitsInsurance,

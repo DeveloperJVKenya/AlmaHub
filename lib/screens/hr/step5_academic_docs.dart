@@ -3,14 +3,14 @@ import 'package:almahub/screens/hr/onboarding_shared_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
-/// Step 4 — Academic & Professional Documents
+/// Step 5 — Academic & Professional Documents
 ///
 /// Three distinct sections:
 ///   1. Academic / Professional Certificates  (multi-upload, merged list)
 ///   2. Training Certificates                 (multi-upload, new)
 ///   3. Professional Certifications           (multi-upload, professional body
 ///                                             / commission identity docs)
-class Step4AcademicDocs extends StatelessWidget {
+class Step5AcademicDocs extends StatelessWidget {
   final GlobalKey<FormState> formKey;
   final AcademicDocuments academicDocs;
   final bool isUploadingFile;
@@ -23,7 +23,7 @@ class Step4AcademicDocs extends StatelessWidget {
     void Function(String url) onSuccess,
   ) onUpload;
 
-  const Step4AcademicDocs({
+  const Step5AcademicDocs({
     super.key,
     required this.formKey,
     required this.academicDocs,

@@ -3,8 +3,8 @@ import 'package:almahub/screens/hr/onboarding_shared_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
-/// Step 5 — Contracts & HR Forms
-class Step5ContractsForms extends StatelessWidget {
+/// Step 6 — Contracts & HR Forms
+class Step6ContractsForms extends StatelessWidget {
   final GlobalKey<FormState> formKey;
   final ContractsAndForms contractsForms;
   final bool isUploadingFile;
@@ -14,7 +14,7 @@ class Step5ContractsForms extends StatelessWidget {
     void Function(String url) onSuccess,
   ) onUpload;
 
-  const Step5ContractsForms({
+  const Step6ContractsForms({
     super.key,
     required this.formKey,
     required this.contractsForms,
