@@ -989,6 +989,17 @@ class _HRDashboardState extends State<HRDashboard> {
   String? _downloadProgress;
   String _searchQuery = '';
 
+  // Scroll Controllers
+  final ScrollController _verticalScrollController = ScrollController();
+  final ScrollController _horizontalScrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _verticalScrollController.dispose();
+    _horizontalScrollController.dispose();
+    super.dispose();
+  }
+
   final Logger _logger = Logger(
     printer: PrettyPrinter(
       methodCount: 2,
@@ -1498,246 +1509,261 @@ class _HRDashboardState extends State<HRDashboard> {
                       );
                     }
 
-                    return SingleChildScrollView(
-                      scrollDirection: Axis.vertical,
+                    // ── Improved Scrollable Table with visible scrollbars ─────────────────
+                    return Scrollbar(
+                      controller: _verticalScrollController,
+                      thumbVisibility: true,
+                      thickness: 8.0,
+                      radius: const Radius.circular(8),
                       child: SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: DataTable(
-                          headingRowHeight: 50,
-                          dataRowMinHeight: 48,
-                          dataRowMaxHeight: 48,
-                          headingRowColor: WidgetStateProperty.all(
-                              Colors.grey.shade100),
-                          columnSpacing: 24,
-                          headingTextStyle: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13,
-                            color: Color.fromARGB(255, 86, 10, 119),
-                          ),
-                          dataTextStyle: const TextStyle(
-                              fontSize: 13, color: Colors.black87),
-                          columns: [
-                            const DataColumn(label: Text('No.')),
-                            const DataColumn(label: Text('Full Name')),
-                            const DataColumn(label: Text('Email')),
-                            const DataColumn(label: Text('Phone')),
-                            const DataColumn(label: Text('National ID')),
-                            const DataColumn(label: Text('Job Title')),
-                            const DataColumn(label: Text('Department')),
-                            const DataColumn(label: Text('Employment Type')),
-                            const DataColumn(label: Text('Start Date')),
-                            const DataColumn(label: Text('KRA PIN')),
-                            const DataColumn(label: Text('NSSF Number')),
-                            const DataColumn(label: Text('NHIF Number')),
-                            const DataColumn(label: Text('Basic Salary')),
-                            const DataColumn(label: Text('Bank Name')),
-                            const DataColumn(label: Text('Account Number')),
-                            if (_statusFilter == 'submitted')
-                              const DataColumn(label: Text('Status')),
-                            const DataColumn(label: Text('Created')),
-                            if (_statusFilter == 'submitted')
-                              const DataColumn(label: Text('Submitted')),
-                            // ── NEW: Documents column ──────────────────────
-                            const DataColumn(
-                              label: Tooltip(
-                                message:
-                                    'Click the badge to view submitted documents',
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      Icons.folder_open_outlined,
-                                      size: 14,
-                                      color: Color.fromARGB(255, 86, 10, 119),
-                                    ),
-                                    SizedBox(width: 4),
-                                    Text('Documents'),
-                                  ],
-                                ),
+                        controller: _verticalScrollController,
+                        scrollDirection: Axis.vertical,
+                        child: Scrollbar(
+                          controller: _horizontalScrollController,
+                          thumbVisibility: true,
+                          thickness: 8.0,
+                          radius: const Radius.circular(8),
+                          child: SingleChildScrollView(
+                            controller: _horizontalScrollController,
+                            scrollDirection: Axis.horizontal,
+                            child: DataTable(
+                              headingRowHeight: 50,
+                              dataRowMinHeight: 48,
+                              dataRowMaxHeight: 48,
+                              headingRowColor: WidgetStateProperty.all(
+                                  Colors.grey.shade100),
+                              columnSpacing: 24,
+                              headingTextStyle: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                                color: Color.fromARGB(255, 86, 10, 119),
                               ),
-                            ),
-                            const DataColumn(label: Text('Actions')),
-                          ],
-                          rows: employees.asMap().entries.map((entry) {
-                            final index = entry.key;
-                            final doc = entry.value;
-                            final data =
-                                doc.data() as Map<String, dynamic>;
-                            final fullName =
-                                data['personalInfo']?['fullName'] ?? '';
-
-                            _logger.d(
-                                'Row ${index + 1}: $fullName (ID: ${doc.id})');
-
-                            return DataRow(
-                              cells: [
-                                DataCell(Text('${index + 1}')),
-                                DataCell(SizedBox(
-                                  width: 150,
-                                  child: Text(fullName,
-                                      overflow: TextOverflow.ellipsis),
-                                )),
-                                DataCell(SizedBox(
-                                  width: 180,
-                                  child: Text(
-                                      data['personalInfo']?['email'] ?? '-',
-                                      overflow: TextOverflow.ellipsis),
-                                )),
-                                DataCell(Text(
-                                    data['personalInfo']?['phoneNumber'] ??
-                                        '-')),
-                                DataCell(Text(
-                                    data['personalInfo']
-                                            ?['nationalIdOrPassport'] ??
-                                        '-')),
-                                DataCell(SizedBox(
-                                  width: 150,
-                                  child: Text(
-                                      data['employmentDetails']?['jobTitle'] ??
-                                          '-',
-                                      overflow: TextOverflow.ellipsis),
-                                )),
-                                DataCell(Text(
-                                    data['employmentDetails']?['department'] ??
-                                        '-')),
-                                DataCell(Text(
-                                    data['employmentDetails']
-                                            ?['employmentType'] ??
-                                        '-')),
-                                DataCell(Text(
-                                  data['employmentDetails']?['startDate'] !=
-                                          null
-                                      ? DateFormat('dd/MM/yyyy').format(
-                                          (data['employmentDetails']
-                                                  ['startDate'] as Timestamp)
-                                              .toDate())
-                                      : '-',
-                                )),
-                                DataCell(Text(
-                                    data['statutoryDocs']?['kraPinNumber'] ??
-                                        '-')),
-                                DataCell(Text(
-                                    data['statutoryDocs']?['nssfNumber'] ??
-                                        '-')),
-                                DataCell(Text(
-                                    data['statutoryDocs']?['nhifNumber'] ??
-                                        '-')),
-                                DataCell(Text(
-                                  data['payrollDetails']?['basicSalary'] != null
-                                      ? 'KES ${NumberFormat('#,###').format(data['payrollDetails']['basicSalary'])}'
-                                      : '-',
-                                )),
-                                DataCell(Text(
-                                    data['payrollDetails']?['bankDetails']
-                                            ?['bankName'] ??
-                                        '-')),
-                                DataCell(Text(
-                                    data['payrollDetails']?['bankDetails']
-                                            ?['accountNumber'] ??
-                                        '-')),
+                              dataTextStyle: const TextStyle(
+                                  fontSize: 13, color: Colors.black87),
+                              columns: [
+                                const DataColumn(label: Text('No.')),
+                                const DataColumn(label: Text('Full Name')),
+                                const DataColumn(label: Text('Email')),
+                                const DataColumn(label: Text('Phone')),
+                                const DataColumn(label: Text('National ID')),
+                                const DataColumn(label: Text('Job Title')),
+                                const DataColumn(label: Text('Department')),
+                                const DataColumn(label: Text('Employment Type')),
+                                const DataColumn(label: Text('Start Date')),
+                                const DataColumn(label: Text('KRA PIN')),
+                                const DataColumn(label: Text('NSSF Number')),
+                                const DataColumn(label: Text('NHIF Number')),
+                                const DataColumn(label: Text('Basic Salary')),
+                                const DataColumn(label: Text('Bank Name')),
+                                const DataColumn(label: Text('Account Number')),
                                 if (_statusFilter == 'submitted')
-                                  DataCell(_buildStatusBadge(
-                                      data['status'] ?? 'submitted')),
-                                DataCell(Text(
-                                  data['createdAt'] != null
-                                      ? DateFormat('dd/MM/yyyy').format(
-                                          (data['createdAt'] as Timestamp)
-                                              .toDate())
-                                      : '-',
-                                )),
+                                  const DataColumn(label: Text('Status')),
+                                const DataColumn(label: Text('Created')),
                                 if (_statusFilter == 'submitted')
-                                  DataCell(Text(
-                                    data['submittedAt'] != null
-                                        ? DateFormat('dd/MM/yyyy').format(
-                                            (data['submittedAt'] as Timestamp)
-                                                .toDate())
-                                        : '-',
-                                  )),
-
-                                // ── NEW: Documents cell ──────────────────────
-                                // Uses the fullName as the storage key (same
-                                // sanitisation logic used in StorageService).
-                                DataCell(
-                                  fullName.isNotEmpty
-                                      ? _EmployeeDocumentsCell(
-                                          employeeName: fullName,
-                                          logger: _logger,
-                                        )
-                                      : const Text('-'),
-                                ),
-
-                                // ── Actions cell (unchanged) ─────────────────
-                                DataCell(
-                                  Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      // ── Edit / Open onboarding form ──────────
-                                      IconButton(
-                                        icon: const Icon(
-                                          Icons.edit_note_rounded,
-                                          size: 20,
+                                  const DataColumn(label: Text('Submitted')),
+                                // Documents column
+                                const DataColumn(
+                                  label: Tooltip(
+                                    message:
+                                        'Click the badge to view submitted documents',
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.folder_open_outlined,
+                                          size: 14,
                                           color: Color.fromARGB(255, 86, 10, 119),
                                         ),
-                                        onPressed: () {
-                                          _logger.i(
-                                              'Edit onboarding for: ${doc.id}');
-                                          Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder: (_) =>
-                                                  HREmployeeOnboardingScreen(
-                                                employeeId: doc.id,
-                                                initialData: data,
-                                                collectionSource:
-                                                    _getCollectionName(),
-                                              ),
-                                            ),
-                                          );
-                                        },
-                                        tooltip: 'Edit Onboarding',
-                                      ),
-                                      if (_statusFilter == 'draft')
-                                        IconButton(
-                                          icon: const Icon(
-                                              Icons.delete_outline,
-                                              size: 20,
-                                              color: Colors.red),
-                                          onPressed: () {
-                                            _logger.i(
-                                                'Delete button clicked for employee: ${doc.id}');
-                                            _deleteEmployee(doc.id, data);
-                                          },
-                                          tooltip: 'Remove User',
-                                        ),
-                                      if (_statusFilter == 'submitted' &&
-                                          data['status'] == 'submitted') ...[
-                                        IconButton(
-                                          icon: const Icon(Icons.check_circle,
-                                              size: 20, color: Colors.green),
-                                          onPressed: () {
-                                            _logger.i(
-                                                'Approve button clicked for employee: ${doc.id}');
-                                            _approveEmployee(doc.id);
-                                          },
-                                          tooltip: 'Approve',
-                                        ),
-                                        IconButton(
-                                          icon: const Icon(Icons.cancel,
-                                              size: 20, color: Colors.red),
-                                          onPressed: () {
-                                            _logger.i(
-                                                'Reject button clicked for employee: ${doc.id}');
-                                            _rejectEmployee(doc.id);
-                                          },
-                                          tooltip: 'Reject',
-                                        ),
+                                        SizedBox(width: 4),
+                                        Text('Documents'),
                                       ],
-                                    ],
+                                    ),
                                   ),
                                 ),
+                                const DataColumn(label: Text('Actions')),
                               ],
-                            );
-                          }).toList(),
+                              rows: employees.asMap().entries.map((entry) {
+                                final index = entry.key;
+                                final doc = entry.value;
+                                final data =
+                                    doc.data() as Map<String, dynamic>;
+                                final fullName =
+                                    data['personalInfo']?['fullName'] ?? '';
+
+                                _logger.d(
+                                    'Row ${index + 1}: $fullName (ID: ${doc.id})');
+
+                                return DataRow(
+                                  cells: [
+                                    DataCell(Text('${index + 1}')),
+                                    DataCell(SizedBox(
+                                      width: 150,
+                                      child: Text(fullName,
+                                          overflow: TextOverflow.ellipsis),
+                                    )),
+                                    DataCell(SizedBox(
+                                      width: 180,
+                                      child: Text(
+                                          data['personalInfo']?['email'] ?? '-',
+                                          overflow: TextOverflow.ellipsis),
+                                    )),
+                                    DataCell(Text(
+                                        data['personalInfo']?['phoneNumber'] ??
+                                            '-')),
+                                    DataCell(Text(
+                                        data['personalInfo']
+                                                ?['nationalIdOrPassport'] ??
+                                            '-')),
+                                    DataCell(SizedBox(
+                                      width: 150,
+                                      child: Text(
+                                          data['employmentDetails']
+                                                  ?['jobTitle'] ??
+                                              '-',
+                                          overflow: TextOverflow.ellipsis),
+                                    )),
+                                    DataCell(Text(
+                                        data['employmentDetails']
+                                                ?['department'] ??
+                                            '-')),
+                                    DataCell(Text(
+                                        data['employmentDetails']
+                                                ?['employmentType'] ??
+                                            '-')),
+                                    DataCell(Text(
+                                      data['employmentDetails']?['startDate'] !=
+                                              null
+                                          ? DateFormat('dd/MM/yyyy').format(
+                                              (data['employmentDetails']
+                                                      ['startDate'] as Timestamp)
+                                                  .toDate())
+                                          : '-',
+                                    )),
+                                    DataCell(Text(
+                                        data['statutoryDocs']?['kraPinNumber'] ??
+                                            '-')),
+                                    DataCell(Text(
+                                        data['statutoryDocs']?['nssfNumber'] ??
+                                            '-')),
+                                    DataCell(Text(
+                                        data['statutoryDocs']?['nhifNumber'] ??
+                                            '-')),
+                                    DataCell(Text(
+                                      data['payrollDetails']?['basicSalary'] !=
+                                              null
+                                          ? 'KES ${NumberFormat('#,###').format(data['payrollDetails']['basicSalary'])}'
+                                          : '-',
+                                    )),
+                                    DataCell(Text(
+                                        data['payrollDetails']?['bankDetails']
+                                                ?['bankName'] ??
+                                            '-')),
+                                    DataCell(Text(
+                                        data['payrollDetails']?['bankDetails']
+                                                ?['accountNumber'] ??
+                                            '-')),
+                                    if (_statusFilter == 'submitted')
+                                      DataCell(_buildStatusBadge(
+                                          data['status'] ?? 'submitted')),
+                                    DataCell(Text(
+                                      data['createdAt'] != null
+                                          ? DateFormat('dd/MM/yyyy').format(
+                                              (data['createdAt'] as Timestamp)
+                                                  .toDate())
+                                          : '-',
+                                    )),
+                                    if (_statusFilter == 'submitted')
+                                      DataCell(Text(
+                                        data['submittedAt'] != null
+                                            ? DateFormat('dd/MM/yyyy').format(
+                                                (data['submittedAt'] as Timestamp)
+                                                    .toDate())
+                                            : '-',
+                                      )),
+
+                                    // Documents cell
+                                    DataCell(
+                                      fullName.isNotEmpty
+                                          ? _EmployeeDocumentsCell(
+                                              employeeName: fullName,
+                                              logger: _logger,
+                                            )
+                                          : const Text('-'),
+                                    ),
+
+                                    // Actions cell
+                                    DataCell(
+                                      Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          IconButton(
+                                            icon: const Icon(
+                                              Icons.edit_note_rounded,
+                                              size: 20,
+                                              color: Color.fromARGB(255, 86, 10, 119),
+                                            ),
+                                            onPressed: () {
+                                              _logger.i(
+                                                  'Edit onboarding for: ${doc.id}');
+                                              Navigator.push(
+                                                context,
+                                                MaterialPageRoute(
+                                                  builder: (_) =>
+                                                      HREmployeeOnboardingScreen(
+                                                    employeeId: doc.id,
+                                                    initialData: data,
+                                                    collectionSource:
+                                                        _getCollectionName(),
+                                                  ),
+                                                ),
+                                              );
+                                            },
+                                            tooltip: 'Edit Onboarding',
+                                          ),
+                                          if (_statusFilter == 'draft')
+                                            IconButton(
+                                              icon: const Icon(
+                                                  Icons.delete_outline,
+                                                  size: 20,
+                                                  color: Colors.red),
+                                              onPressed: () {
+                                                _logger.i(
+                                                    'Delete button clicked for employee: ${doc.id}');
+                                                _deleteEmployee(doc.id, data);
+                                              },
+                                              tooltip: 'Remove User',
+                                            ),
+                                          if (_statusFilter == 'submitted' &&
+                                              data['status'] == 'submitted') ...[
+                                            IconButton(
+                                              icon: const Icon(Icons.check_circle,
+                                                  size: 20, color: Colors.green),
+                                              onPressed: () {
+                                                _logger.i(
+                                                    'Approve button clicked for employee: ${doc.id}');
+                                                _approveEmployee(doc.id);
+                                              },
+                                              tooltip: 'Approve',
+                                            ),
+                                            IconButton(
+                                              icon: const Icon(Icons.cancel,
+                                                  size: 20, color: Colors.red),
+                                              onPressed: () {
+                                                _logger.i(
+                                                    'Reject button clicked for employee: ${doc.id}');
+                                                _rejectEmployee(doc.id);
+                                              },
+                                              tooltip: 'Reject',
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              }).toList(),
+                            ),
+                          ),
                         ),
                       ),
                     );

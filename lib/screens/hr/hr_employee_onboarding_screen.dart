@@ -390,14 +390,43 @@ class _HREmployeeOnboardingScreenState
   }
 
   // ── File upload ────────────────────────────────────────────────────────────
+  //
+  // Storage path MUST match the rules:
+  //   employee_documents/{employeeName}/{fieldName}/{filename}
+  //
+  // Content-type metadata is required because the storage rules validate
+  // request.resource.contentType on every create/update operation.
+  // ─────────────────────────────────────────────────────────────────────────
+  String _contentTypeFromExtension(String ext) {
+    switch (ext.toLowerCase()) {
+      case 'pdf':
+        return 'application/pdf';
+      case 'jpg':
+      case 'jpeg':
+        return 'image/jpeg';
+      case 'png':
+        return 'image/png';
+      case 'gif':
+        return 'image/gif';
+      case 'doc':
+        return 'application/msword';
+      case 'docx':
+        return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+      default:
+        return 'application/octet-stream';
+    }
+  }
+
   Future<void> _handleUpload(
     String fieldName,
     void Function(String url) onSuccess,
   ) async {
     try {
+      // Extensions are kept in sync with the content-types allowed by the
+      // storage rules (pdf · images · msword · openxmlformats-officedocument)
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
-        allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
+        allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx'],
         withData: true,
       );
       if (result == null || result.files.isEmpty) return;
@@ -408,17 +437,26 @@ class _HREmployeeOnboardingScreenState
 
       setState(() => _isUploadingFile = true);
 
+      // Sanitise the employee name to produce a safe path segment.
       final sanitisedName = _personalInfo.fullName.isNotEmpty
           ? _personalInfo.fullName
               .toLowerCase()
               .replaceAll(RegExp(r'[^a-z0-9]'), '_')
           : 'unknown_employee';
+
       final ts = DateTime.now().millisecondsSinceEpoch;
+
+      // ✅ Path now matches the storage rule:
+      //    employee_documents/{employeeName}/{fieldName}/{filename}
       final storagePath =
-          'employees/$sanitisedName/$fieldName/${ts}_${file.name}';
+          'employee_documents/$sanitisedName/$fieldName/${ts}_${file.name}';
+
+      // ✅ Explicit content-type so the rule's contentType check always passes.
+      final ext = (file.extension ?? '').toLowerCase();
+      final metadata = SettableMetadata(contentType: _contentTypeFromExtension(ext));
 
       final ref = FirebaseStorage.instance.ref(storagePath);
-      await ref.putData(bytes);
+      await ref.putData(bytes, metadata);
       final url = await ref.getDownloadURL();
 
       onSuccess(url);
@@ -564,6 +602,32 @@ class _HREmployeeOnboardingScreenState
         'uploadedAt': Timestamp.fromDate(d.uploadedAt),
       };
 
+  // ── Sanitized document ID ──────────────────────────────────────────────────
+  //
+  // Converts the employee full name into a human-readable Firestore document ID
+  // that preserves original casing and uses underscores in place of spaces.
+  //
+  //   "Fabron Lubanga"      → "Fabron_Lubanga"
+  //   "Mary-Anne O'Brien"   → "Mary-Anne_OBrien"
+  //   "  Jane   Doe  "      → "Jane_Doe"
+  //
+  // Falls back to a timestamp-based ID when the name field is still empty so
+  // the form can still be saved at step 1 before the name has been entered.
+  // ─────────────────────────────────────────────────────────────────────────
+  String _buildDocumentId() {
+    final name = _personalInfo.fullName.trim();
+    if (name.isEmpty) {
+      return 'Employee_${DateTime.now().millisecondsSinceEpoch}';
+    }
+    return name
+        .replaceAll(RegExp(r"['\u2018\u2019\u0060]"), '') // strip apostrophes / backticks
+        .replaceAll(RegExp(r'[^a-zA-Z0-9\s\-]'), '')     // remove unsafe chars (keep hyphens)
+        .trim()
+        .replaceAll(RegExp(r'\s+'), '_')                  // spaces  → underscores
+        .replaceAll(RegExp(r'-{2,}'), '-')                // collapse consecutive hyphens
+        .replaceAll(RegExp(r'_{2,}'), '_');               // collapse consecutive underscores
+  }
+
   // ── Save Draft ─────────────────────────────────────────────────────────────
   Future<void> _saveDraft() async {
     setState(() => _isSaving = true);
@@ -572,15 +636,18 @@ class _HREmployeeOnboardingScreenState
         ..['status'] = 'draft'
         ..['updatedAt'] = FieldValue.serverTimestamp();
 
-      if (_documentId != null) {
-        await _firestore
-            .collection('Draft')
-            .doc(_documentId)
-            .set(payload, SetOptions(merge: true));
-      } else {
-        payload['createdAt'] = FieldValue.serverTimestamp();
-        final ref = await _firestore.collection('Draft').add(payload);
-        setState(() => _documentId = ref.id);
+      // Resolve the document ID:
+      //   • edit mode  → reuse the ID we already have
+      //   • new record → build a sanitized name-based ID (e.g. "Fabron_Lubanga")
+      final docId = _documentId ?? _buildDocumentId();
+
+      await _firestore
+          .collection('Draft')
+          .doc(docId)
+          .set(payload, SetOptions(merge: true));
+
+      if (_documentId == null) {
+        setState(() => _documentId = docId);
       }
 
       _logger.i('Draft saved: $_documentId');
@@ -672,12 +739,20 @@ class _HREmployeeOnboardingScreenState
         ..['submittedAt'] = FieldValue.serverTimestamp()
         ..['updatedAt'] = FieldValue.serverTimestamp();
 
-      // Delete draft if it existed, then write to EmployeeDetails
+      // Delete draft if it existed, then write to EmployeeDetails.
+      // The EmployeeDetails document uses the same sanitized name as the
+      // Draft so the record is identifiable at a glance in the console
+      // (e.g. "Fabron_Lubanga" instead of a random UID).
+      final employeeDocId = _buildDocumentId();
+
       if (_documentId != null) {
         await _firestore.collection('Draft').doc(_documentId).delete();
       }
       payload['createdAt'] = FieldValue.serverTimestamp();
-      await _firestore.collection('EmployeeDetails').add(payload);
+      await _firestore
+          .collection('EmployeeDetails')
+          .doc(employeeDocId)
+          .set(payload, SetOptions(merge: true));
 
       _logger.i('Onboarding submitted for: ${_personalInfo.fullName}');
 
