@@ -261,6 +261,12 @@ class _HRPolicyManagementScreenState extends State<HRPolicyManagementScreen> {
     }
   }
 
+  // ── Responsive breakpoints ───────────────────────────────────────────────
+  // Centralised so the body layout and the FAB visibility logic can never
+  // disagree with each other.
+  static const double _wideBreakpoint = 900;
+  bool _isWideLayout(double width) => width >= _wideBreakpoint;
+
   // ── Build ─────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
@@ -282,39 +288,73 @@ class _HRPolicyManagementScreenState extends State<HRPolicyManagementScreen> {
           const SizedBox(width: 8),
         ],
       ),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          final isWide = constraints.maxWidth >= 900;
-          return Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Upload Form (Left Panel)
-              Container(
-                width: isWide ? 420 : constraints.maxWidth,
-                margin: const EdgeInsets.all(16),
-                child: _buildUploadForm(),
-              ),
-              if (isWide) const VerticalDivider(width: 1),
-              if (isWide)
-                Expanded(
-                  child: Container(
-                    margin: const EdgeInsets.all(16),
-                    child: _buildPolicyList(),
+      body: SafeArea(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isWide = _isWideLayout(constraints.maxWidth);
+
+            if (isWide) {
+              // Desktop / large-tablet landscape: two-pane layout.
+              // The left pane gets an explicit height equal to the
+              // available space and scrolls internally, so the form can
+              // never overflow vertically even on short-height monitors
+              // (e.g. small laptops) where the right pane's policy list
+              // would otherwise fit but the form would not.
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: 420,
+                    height: constraints.maxHeight,
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.all(16),
+                      child: _buildUploadForm(),
+                    ),
                   ),
+                  const VerticalDivider(width: 1),
+                  Expanded(
+                    child: Container(
+                      margin: const EdgeInsets.all(16),
+                      child: _buildPolicyList(),
+                    ),
+                  ),
+                ],
+              );
+            }
+
+            // Mobile / tablet portrait / landscape phones: single scrollable
+            // column. Wrapping in SingleChildScrollView means rotating the
+            // device or running on a shorter screen just changes how much
+            // scrolling is needed instead of causing a RenderFlex overflow.
+            // The ConstrainedBox keeps the form a comfortable reading width
+            // on tablets instead of stretching it edge-to-edge.
+            return SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 640),
+                  child: _buildUploadForm(),
                 ),
-            ],
-          );
-        },
+              ),
+            );
+          },
+        ),
       ),
-      // On mobile, show list in a separate tab or bottom sheet
+      // On mobile/tablet, the policy list lives in a bottom sheet instead of
+      // a fixed pane, so it never competes with the form for vertical space.
       floatingActionButton: LayoutBuilder(
         builder: (context, constraints) {
-          if (constraints.maxWidth >= 900) return const SizedBox.shrink();
+          if (_isWideLayout(constraints.maxWidth)) {
+            return const SizedBox.shrink();
+          }
           return FloatingActionButton.extended(
             onPressed: () => _showPolicyListBottomSheet(context),
             backgroundColor: const Color(0xFF54046C),
             icon: const Icon(Icons.list, color: Colors.white),
-            label: const Text('View Policies', style: TextStyle(color: Colors.white)),
+            label: const Text(
+              'View Policies',
+              style: TextStyle(color: Colors.white),
+            ),
           );
         },
       ),

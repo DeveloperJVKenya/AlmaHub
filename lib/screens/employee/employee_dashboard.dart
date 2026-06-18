@@ -635,18 +635,31 @@ class _EmployeeDashboardState extends State<EmployeeDashboard>
           backgroundColor: const Color(0xFFF5F5FA),
           appBar: _buildModernAppBar(isDesktop),
           drawer: isDesktop ? null : _buildMobileDrawer(),
-          body: isDesktop ? _buildDesktopBody() : _buildMobileBody(),
+          body: isDesktop
+              ? _buildDesktopBody(constraints)
+              : _buildMobileBody(),
         );
       },
     );
   }
 
-  Widget _buildDesktopBody() {
+  Widget _buildDesktopBody(BoxConstraints constraints) {
+    // Reserve the sidebar's own top (16) + bottom (20) margin so the
+    // ConstrainedBox below reflects the height that's actually available to
+    // it. On a tall monitor the menu fits comfortably inside this and no
+    // scrolling is needed; on a shorter screen (smaller laptop, low-res
+    // external monitor, etc.) the menu now scrolls inside the white card
+    // instead of overflowing past its rounded-corner background.
+    final sidebarMaxHeight = (constraints.maxHeight - 36).clamp(
+      0.0,
+      double.infinity,
+    );
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
           width: 280,
+          constraints: BoxConstraints(maxHeight: sidebarMaxHeight),
           margin: const EdgeInsets.fromLTRB(20, 16, 0, 20),
           decoration: BoxDecoration(
             color: Colors.white,
@@ -661,7 +674,10 @@ class _EmployeeDashboardState extends State<EmployeeDashboard>
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(20),
-            child: _buildSidebarContent(),
+            child: SingleChildScrollView(
+              physics: const ClampingScrollPhysics(),
+              child: _buildSidebarContent(),
+            ),
           ),
         ),
         const SizedBox(width: 20),
@@ -773,25 +789,29 @@ class _EmployeeDashboardState extends State<EmployeeDashboard>
             ),
           ),
           const SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Text(
-                'My Profile',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Text(
+                  'My Profile',
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
                 ),
-              ),
-              Text(
-                _currentUserRole != null
-                    ? 'Role: $_currentUserRole'
-                    : 'Employee Portal',
-                style: const TextStyle(fontSize: 12, color: Colors.white70),
-              ),
-            ],
+                Text(
+                  _currentUserRole != null
+                      ? 'Role: $_currentUserRole'
+                      : 'Employee Portal',
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 12, color: Colors.white70),
+                ),
+              ],
+            ),
           ),
         ],
       ),
