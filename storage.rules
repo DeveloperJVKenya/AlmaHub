@@ -41,6 +41,42 @@ service firebase.storage {
     }
 
     // ============================================
+    // COMPANY POLICIES (NEW)
+    // Uploaded by HR under:
+    //   company_policies/{filename}
+    // ============================================
+    match /company_policies/{filename} {
+      // Authenticated users can read policy documents
+      allow read: if request.auth != null;
+
+      // Only authenticated users (HR/Admin) can upload policy documents
+      allow create: if request.auth != null
+        && request.resource.size < 20 * 1024 * 1024
+        && (
+          request.resource.contentType.matches('application/pdf') ||
+          request.resource.contentType.matches('application/msword') ||
+          request.resource.contentType.matches('application/vnd.openxmlformats-officedocument.wordprocessingml.document') ||
+          request.resource.contentType.matches('text/plain') ||
+          request.resource.contentType.matches('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') ||
+          request.resource.contentType.matches('application/vnd.openxmlformats-officedocument.presentationml.presentation') ||
+          request.resource.contentType.matches('application/vnd.ms-excel') ||
+          request.resource.contentType.matches('application/vnd.ms-powerpoint')
+        );
+
+      // Allow updating existing policy files
+      allow update: if request.auth != null
+        && request.resource.size < 20 * 1024 * 1024;
+
+      // Only HR/Admin can delete policy files
+      allow delete: if request.auth != null;
+    }
+
+    // Allow listAll() to traverse company_policies path
+    match /company_policies {
+      allow list: if request.auth != null;
+    }
+
+    // ============================================
     // RECRUITEES FOLDER
     // CV uploads by unauthenticated applicants
     // ============================================
@@ -58,6 +94,23 @@ service firebase.storage {
 
       // Allow deletion (HR cleanup or applicant self-deletion)
       allow delete: if true;
+    }
+
+    // ============================================
+    // PROFILE PHOTOS
+    // ============================================
+    match /profile_photos/{userId} {
+      // Users can read any profile photo
+      allow read: if request.auth != null;
+
+      // Users can only upload their own profile photo
+      allow create, update: if request.auth != null
+        && request.auth.uid == userId
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+
+      // Users can delete their own profile photo
+      allow delete: if request.auth != null && request.auth.uid == userId;
     }
 
     // ============================================

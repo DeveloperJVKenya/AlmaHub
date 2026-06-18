@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io' show File;
 import 'package:almahub/models/employee_onboarding_models.dart';
 import 'package:almahub/screens/hr/hr_employee_onboarding_screen.dart';
@@ -5,6 +6,10 @@ import 'package:almahub/screens/hr/hr_recruitment_dashboard.dart';
 import 'package:almahub/services/excel_download_service.dart';
 import 'package:almahub/services/excel_generation_service.dart';
 import 'package:almahub/services/storage_service.dart';
+import 'package:almahub/screens/hr/Policy%20Management/company_policy_model.dart';
+import 'package:almahub/screens/hr/Policy%20Management/policy_status_model.dart';
+import 'package:almahub/screens/hr/Policy%20Management/policy_service.dart';
+import 'package:almahub/screens/hr/Policy%20Management/hr_policy_management_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -989,6 +994,12 @@ class _HRDashboardState extends State<HRDashboard> {
   String? _downloadProgress;
   String _searchQuery = '';
 
+  final PolicyService _policyService = PolicyService();
+  List<CompanyPolicy> _policies = [];
+  Map<String, Map<String, PolicyStatus>> _allEmployeePolicyStatuses = {};
+  StreamSubscription? _policiesSubscription;
+  StreamSubscription? _employeeStatusesSubscription;
+
   // Scroll Controllers
   final ScrollController _verticalScrollController = ScrollController();
   final ScrollController _horizontalScrollController = ScrollController();
@@ -997,6 +1008,8 @@ class _HRDashboardState extends State<HRDashboard> {
   void dispose() {
     _verticalScrollController.dispose();
     _horizontalScrollController.dispose();
+    _policiesSubscription?.cancel();
+    _employeeStatusesSubscription?.cancel();
     super.dispose();
   }
 
@@ -1016,6 +1029,39 @@ class _HRDashboardState extends State<HRDashboard> {
     super.initState();
     _logger.i('=== HR Dashboard Initialized ===');
     _logger.d('Initial status filter: $_statusFilter');
+    _loadPoliciesForDashboard();
+  }
+
+  void _loadPoliciesForDashboard() {
+    // Listen to policies stream for auto-column generation
+    _policiesSubscription = _policyService.getPoliciesStream().listen(
+      (policies) {
+        if (!mounted) return;
+        setState(() => _policies = policies);
+      },
+      onError: (e) => _logger.e('Error loading policies for dashboard', error: e),
+    );
+
+    // Listen to all policy statuses for employee tracking
+    _employeeStatusesSubscription = _policyService
+        .getPoliciesStream()
+        .asyncMap((policies) async {
+      final Map<String, Map<String, PolicyStatus>> result = {};
+      for (var policy in policies) {
+        final statuses = await _policyService.getPolicyStatusStream(policy.id).first;
+        for (var status in statuses) {
+          result.putIfAbsent(status.employeeUid, () => {});
+          result[status.employeeUid]![policy.id] = status;
+        }
+      }
+      return result;
+    }).listen(
+      (statuses) {
+        if (!mounted) return;
+        setState(() => _allEmployeePolicyStatuses = statuses);
+      },
+      onError: (e) => _logger.e('Error loading policy statuses', error: e),
+    );
   }
 
   @override
@@ -1036,6 +1082,22 @@ class _HRDashboardState extends State<HRDashboard> {
           ),
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.policy,
+                color: Color.fromARGB(255, 242, 241, 243)),
+            onPressed: () {
+              _logger.i('Navigating to Policy Management');
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const HRPolicyManagementScreen(),
+                ),
+              );
+            },
+            tooltip: 'Manage Policies',
+          ),
+          const SizedBox(width: 8),
+
           // ── Onboard Employee shortcut ──────────────────────────────
           IconButton(
             icon: const Icon(Icons.person_add_rounded,
@@ -1580,6 +1642,32 @@ class _HRDashboardState extends State<HRDashboard> {
                                     ),
                                   ),
                                 ),
+                                // ═══════════════════════════════════════════
+                                //  NEW: Dynamic Policy Columns
+                                // ═══════════════════════════════════════════
+                                ..._policies.map((policy) => DataColumn(
+                                  label: Tooltip(
+                                    message: policy.title,
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          _getPolicyFileIcon(policy.fileType),
+                                          size: 12,
+                                          color: const Color.fromARGB(255, 86, 10, 119),
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Flexible(
+                                          child: Text(
+                                            policy.title,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(fontSize: 11),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                )),
                                 const DataColumn(label: Text('Actions')),
                               ],
                               rows: employees.asMap().entries.map((entry) {
@@ -1691,6 +1779,16 @@ class _HRDashboardState extends State<HRDashboard> {
                                           : const Text('-'),
                                     ),
 
+                                    // Policy status cells
+                                    ..._policies.map((policy) {
+                                      final employeeUid = data['uid'] as String? ?? '';
+                                      final status = _allEmployeePolicyStatuses[employeeUid]?[policy.id];
+
+                                      return DataCell(
+                                        _buildPolicyStatusCell(status),
+                                      );
+                                    }),
+
                                     // Actions cell
                                     DataCell(
                                       Row(
@@ -1775,6 +1873,137 @@ class _HRDashboardState extends State<HRDashboard> {
         );
       },
     );
+  }
+
+  Widget _buildPolicyStatusCell(PolicyStatus? status) {
+    if (status == null) {
+      // No status record yet - show pending/unread
+      return Tooltip(
+        message: 'Policy not yet acknowledged',
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: Colors.grey.withValues(alpha:0.1),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.circle_outlined, size: 12, color: Colors.grey),
+              SizedBox(width: 4),
+              Text(
+                'Pending',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (status.isAccepted) {
+      return Tooltip(
+        message: 'Accepted on ${DateFormat('dd MMM yyyy').format(status.acceptedAt!)}',
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: Colors.green..withValues(alpha:0.1),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.green.withValues(alpha:0.3)),
+          ),
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.check_circle, size: 12, color: Colors.green),
+              SizedBox(width: 4),
+              Text(
+                'Accepted',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.green,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (status.isOpened) {
+      return Tooltip(
+        message: 'Opened but not yet accepted. Last opened: ${DateFormat('dd MMM yyyy').format(status.lastOpenedAt!)}',
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: Colors.orange.withValues(alpha:0.1),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.orange.withValues(alpha:0.3)),
+          ),
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.visibility, size: 12, color: Colors.orange),
+              SizedBox(width: 4),
+              Text(
+                'Opened',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.orange,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Unread
+    return Tooltip(
+      message: 'Employee has not opened this policy',
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: Colors.red.withValues(alpha:0.1),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.red.withValues(alpha:0.3)),
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.cancel, size: 12, color: Colors.red),
+            SizedBox(width: 4),
+            Text(
+              'Unread',
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                color: Colors.red,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  IconData _getPolicyFileIcon(String fileType) {
+    switch (fileType.toLowerCase()) {
+      case 'pdf': return Icons.picture_as_pdf;
+      case 'doc':
+      case 'docx': return Icons.description;
+      case 'xls':
+      case 'xlsx': return Icons.table_chart;
+      case 'ppt':
+      case 'pptx': return Icons.slideshow;
+      case 'txt': return Icons.text_snippet;
+      default: return Icons.insert_drive_file;
+    }
   }
 
   // ── Table header (unchanged) ────────────────────────────────────────────────

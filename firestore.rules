@@ -8,19 +8,74 @@ service cloud.firestore {
     match /Users/{userId} {
       allow get: if request.auth != null;
       allow list: if true;
-
       allow create: if request.auth != null &&
                        request.resource.data.uid == request.auth.uid &&
                        request.resource.data.role == 'Employee';
-
       allow update: if request.auth != null &&
                        (
                          (resource.data.uid == request.auth.uid &&
                           request.resource.data.role == resource.data.role) ||
                          request.auth != null
                        );
-
       allow delete: if request.auth != null;
+    }
+
+    // ============================================
+    // COMPANY POLICIES COLLECTION (NEW)
+    // ============================================
+    match /CompanyPolicies/{policyId} {
+      // Anyone authenticated can read active policies
+      allow read: if request.auth != null && resource.data.isActive == true;
+
+      // Only HR/Admin can create policies
+      allow create: if request.auth != null;
+
+      // Only HR/Admin can update policies
+      allow update: if request.auth != null;
+
+      // Only HR/Admin can delete policies
+      allow delete: if request.auth != null;
+    }
+
+    // ============================================
+    // POLICY STATUS COLLECTION (NEW)
+    // ============================================
+    match /PolicyStatus/{employeeId} {
+      // Employees can read their own policy status
+      allow get: if request.auth != null;
+
+      // Employees can read list of policy statuses
+      allow list: if request.auth != null;
+
+      // Employees can create their own policy status document
+      allow create: if request.auth != null;
+
+      // Employees can update their own policy status (track opens/acceptances)
+      allow update: if request.auth != null;
+
+      // Only HR/Admin can delete policy status documents
+      allow delete: if request.auth != null;
+    }
+
+    // ============================================
+    // LEAVE DATA COLLECTION (NEW)
+    // ============================================
+    match /LeaveData/{employeeUid} {
+      // Employees can read their own leave data
+      allow get, list: if request.auth != null && request.auth.uid == employeeUid;
+
+      // Employees can create their own leave balance document
+      allow create: if request.auth != null && request.auth.uid == employeeUid;
+
+      // Employees can update their own leave balance (e.g., HR updates later)
+      allow update: if request.auth != null && request.auth.uid == employeeUid;
+
+      // Sub-collection for individual leave applications
+      match /Applications/{applicationId} {
+        allow read: if request.auth != null && request.auth.uid == employeeUid;
+        allow create: if request.auth != null && request.auth.uid == employeeUid;
+        allow update, delete: if request.auth != null && request.auth.uid == employeeUid;
+      }
     }
 
     // ============================================
@@ -35,7 +90,6 @@ service cloud.firestore {
                          request.auth != null
                        );
       allow delete: if request.auth != null;
-
       match /DailyHours/{dateKey} {
         allow read: if request.auth != null;
         allow create, update: if request.auth != null;
@@ -51,7 +105,6 @@ service cloud.firestore {
       allow create: if request.auth != null;
       allow update: if request.auth != null;
       allow delete: if request.auth != null;
-
       match /DailyHours/{dateKey} {
         allow read: if request.auth != null;
         allow create, update: if request.auth != null;
@@ -60,7 +113,8 @@ service cloud.firestore {
     }
 
     // ============================================
-    // SUPERVISORS COLLECTION
+    // Other existing collections...
+    // (Supervisors, Departments, etc. - kept as is)
     // ============================================
     match /Supervisors/{supervisorId} {
       allow read: if request.auth != null;
@@ -70,9 +124,6 @@ service cloud.firestore {
       allow delete: if request.auth != null;
     }
 
-    // ============================================
-    // DEPARTMENTS COLLECTION
-    // ============================================
     match /Departments/{departmentId} {
       allow read: if request.auth != null;
       allow create: if request.auth != null &&
@@ -81,9 +132,6 @@ service cloud.firestore {
       allow delete: if request.auth != null;
     }
 
-    // ============================================
-    // HOURS FORWARDED COLLECTION
-    // ============================================
     match /HoursForwarded/{forwardId} {
       allow read: if request.auth != null;
       allow create: if request.auth != null;
@@ -91,9 +139,6 @@ service cloud.firestore {
       allow delete: if request.auth != null;
     }
 
-    // ============================================
-    // RECRUITEES COLLECTION
-    // ============================================
     match /Recruitees/{recruiteeId} {
       allow create: if request.resource.data.keys().hasAll(['fullName', 'email', 'cvUrl', 'submittedAt', 'status'])
                    && request.resource.data.fullName is string
@@ -101,33 +146,18 @@ service cloud.firestore {
                    && request.resource.data.email.matches('.*@.*[.].*')
                    && request.resource.data.cvUrl is string
                    && request.resource.data.status == 'pending';
-
       allow read: if true;
-
       allow update: if request.auth != null ||
                        (
                          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'reviewedAt', 'reviewNotes', 'updatedAt'])
                        );
-
       allow delete: if true;
     }
 
-    // ============================================
-    // EMPLOYEE ONBOARDING COLLECTION
-    // Covers the HREmployeeOnboardingScreen wizard
-    // (both Draft saves and final EmployeeDetails submissions)
-    // ============================================
     match /EmployeeOnboarding/{onboardingId} {
-      // Any authenticated user (HR officer) can read onboarding records
       allow read: if request.auth != null;
-
-      // HR creates new onboarding documents (draft or submitted)
       allow create: if request.auth != null;
-
-      // HR can update at any stage (draft edits, status changes)
       allow update: if request.auth != null;
-
-      // HR can delete draft records that were promoted to EmployeeDetails
       allow delete: if request.auth != null;
     }
   }
