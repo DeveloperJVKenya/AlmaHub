@@ -8,7 +8,9 @@ import 'package:almahub/screens/supervisor/supervisor_dashboard.dart';
 import 'package:almahub/screens/hr/Policy%20Management/company_policy_model.dart';
 import 'package:almahub/screens/hr/Policy%20Management/policy_status_model.dart';
 import 'package:almahub/screens/hr/Policy%20Management/policy_service.dart';
-import 'package:almahub/screens/hr/Policy%20Management/policy_viewer_screen.dart';
+import 'package:almahub/screens/hr/Policy%20Management/policy_document_actions.dart';
+// PolicyViewerScreen replaced by _openDocument() — same viewer approach as DrawingsScreen
+// import 'package:almahub/screens/hr/Policy%20Management/policy_viewer_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -1416,6 +1418,12 @@ class _EmployeeDashboardState extends State<EmployeeDashboard>
   }
 
   Widget _buildDocumentCard(DocumentInfo doc) {
+    // Infer the file type from the document name so the icon and viewer
+    // routing both reflect the actual format (PDF, DOCX, XLSX, etc.).
+    final fileExtension = doc.name.contains('.')
+        ? doc.name.split('.').last.toLowerCase()
+        : 'pdf';
+
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(14),
@@ -1429,12 +1437,13 @@ class _EmployeeDashboardState extends State<EmployeeDashboard>
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: Colors.red.withValues(alpha: 0.1),
+              // Icon colour now matches file type (red=PDF, blue=DOCX, etc.)
+              color: _getFileTypeColor(fileExtension).withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: const Icon(
-              Icons.picture_as_pdf_outlined,
-              color: Colors.redAccent,
+            child: Icon(
+              _getFileTypeIcon(fileExtension),
+              color: _getFileTypeColor(fileExtension),
               size: 22,
             ),
           ),
@@ -1461,7 +1470,11 @@ class _EmployeeDashboardState extends State<EmployeeDashboard>
           ),
           IconButton(
             icon: Icon(Icons.open_in_new, size: 18, color: Colors.grey[600]),
-            onPressed: () {},
+            tooltip: 'Open document',
+            // ⚠️  Verify the URL field name on DocumentInfo.
+            //     Replace `doc.url` with the actual field if it differs
+            //     (common alternatives: doc.fileUrl, doc.downloadUrl).
+            onPressed: () => _openDocument(doc.url, fileExtension, doc.name),
           ),
         ],
       ),
@@ -2102,20 +2115,25 @@ class _EmployeeDashboardState extends State<EmployeeDashboard>
     final currentUser = _auth.currentUser;
     if (currentUser == null) return;
 
-    // Navigate to policy viewer
-    await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => PolicyViewerScreen(
-          policy: policy,
-          employeeUid: currentUser.uid,
-        ),
-      ),
+    // Mark the policy as "opened" so the status badge updates in real-time
+    // via the existing Firestore stream. recordPolicyOpened() handles both
+    // first-open (sets openedAt, transitions 'unread' → 'opened') and
+    // subsequent reopens (updates lastOpenedAt only).
+    try {
+      await _policyService.recordPolicyOpened(currentUser.uid, policy.id);
+    } catch (e) {
+      _logger.w('Could not update policy opened status: $e');
+    }
+
+    // Open with the cross-platform viewer (Microsoft Office Online on web for
+    // Office files; direct URL for PDF/images; cache + OS app on native).
+    await _openDocument(
+      policy.fileUrl,   // confirmed: CompanyPolicy.fileUrl (Firebase Storage URL)
+      policy.fileType,
+      policy.fileName,
     );
 
-    // After returning, refresh statuses
-    // The stream listener will auto-update, but we can force a refresh
-    _logger.i('Returned from policy viewer: ${policy.title}');
+    _logger.i('Policy opened: ${policy.title}');
   }
 
   Future<void> _markPolicyAccepted(CompanyPolicy policy) async {
@@ -2219,6 +2237,28 @@ class _EmployeeDashboardState extends State<EmployeeDashboard>
         ),
       );
     }
+  }
+
+  // ── Cross-platform document opener ────────────────────────────────────
+  //
+  // The actual open/viewer/fallback strategy now lives in
+  // PolicyDocumentActions (Policy Management/policy_document_actions.dart)
+  // so it is shared — and stays in sync — with the HR Policy Management
+  // screen. See that file's class doc comment for the root-cause
+  // explanation of why Word/Excel/PowerPoint policies previously failed
+  // to open while PDFs worked fine, and how the fix + automatic browser
+  // fallback resolves it on every platform.
+  Future<void> _openDocument(
+    String url,
+    String fileType,
+    String fileName,
+  ) {
+    return PolicyDocumentActions.openDocument(
+      context: context,
+      url: url,
+      fileType: fileType,
+      fileName: fileName,
+    );
   }
 
   // Helper methods for file type icons/colors

@@ -3,7 +3,6 @@ import 'package:almahub/screens/hr/Policy%20Management/policy_status_model.dart'
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:logger/logger.dart';
 import 'dart:io' show File;
 import 'dart:typed_data';
@@ -91,12 +90,20 @@ class PolicyService {
       );
 
       UploadTask uploadTask;
-      if (kIsWeb && fileData is Uint8List) {
+      // ROOT CAUSE FIX: the old guard `kIsWeb && fileData is Uint8List` caused
+      // native uploads to always throw ArgumentError after the screen was fixed
+      // to send Uint8List on every platform.
+      // Fix: branch purely on runtime type — Uint8List always uses putData,
+      // File always uses putFile — no platform flag needed.
+      if (fileData is Uint8List) {
         uploadTask = fileRef.putData(fileData, metadata);
       } else if (fileData is File) {
         uploadTask = fileRef.putFile(fileData, metadata);
       } else {
-        throw ArgumentError('Invalid file data type');
+        throw ArgumentError(
+          'Invalid fileData type: ${fileData.runtimeType}. '
+          'Expected Uint8List (both platforms) or File (native fallback).',
+        );
       }
 
       final snapshot = await uploadTask;

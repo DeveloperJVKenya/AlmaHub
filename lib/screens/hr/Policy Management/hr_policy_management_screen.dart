@@ -1,11 +1,12 @@
 import 'package:almahub/screens/hr/Policy%20Management/company_policy_model.dart';
 import 'package:almahub/screens/hr/Policy%20Management/policy_service.dart';
+import 'package:almahub/screens/hr/Policy%20Management/policy_document_actions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:file_picker/file_picker.dart';
 import 'package:logger/logger.dart';
 import 'dart:io' show File;
-//import 'dart:typed_data';
+import 'dart:typed_data';
 
 
 /// HR screen for uploading and managing company policies.
@@ -92,17 +93,24 @@ class _HRPolicyManagementScreenState extends State<HRPolicyManagementScreen> {
     setState(() => _isUploading = true);
 
     try {
-      dynamic fileData;
+      // ── Normalize to Uint8List for consistent cross-platform upload ──────
+      // ROOT CAUSE FIX: previously the web path sent Uint8List while the
+      // native path sent a File object to PolicyService.uploadPolicy().
+      // Those two types triggered different Firebase Storage upload methods
+      // inside the service (putData vs putFile), which produced Storage URLs
+      // stored in Firestore in subtly different formats — breaking the viewer.
+      //
+      // Fix: always read the file into bytes first so the service receives
+      // the same Uint8List type on every platform → single upload code-path
+      // → identical URL format every time → viewer always gets a valid URL.
+      Uint8List fileBytes;
       if (kIsWeb) {
-        fileData = _selectedFile!.bytes;
-        if (fileData == null) {
-          throw Exception('File bytes not available on web');
-        }
+        final bytes = _selectedFile!.bytes;
+        if (bytes == null) throw Exception('File bytes not available on web');
+        fileBytes = bytes;
       } else {
-        if (_selectedFile!.path == null) {
-          throw Exception('File path not available');
-        }
-        fileData = File(_selectedFile!.path!);
+        if (_selectedFile!.path == null) throw Exception('File path not available');
+        fileBytes = await File(_selectedFile!.path!).readAsBytes();
       }
 
       final policy = await _policyService.uploadPolicy(
@@ -110,7 +118,7 @@ class _HRPolicyManagementScreenState extends State<HRPolicyManagementScreen> {
         description: _descriptionController.text.trim().isNotEmpty
             ? _descriptionController.text.trim()
             : null,
-        fileData: fileData,
+        fileData: fileBytes,      // always Uint8List — single upload code-path
         fileName: _selectedFile!.name,
         fileType: _selectedFile!.extension ?? 'unknown',
       );
@@ -680,6 +688,23 @@ class _PolicyListTile extends StatelessWidget {
     required this.onDelete,
   });
 
+  void _handleView(BuildContext context) {
+    PolicyDocumentActions.openDocument(
+      context: context,
+      url: policy.fileUrl,
+      fileType: policy.fileType,
+      fileName: policy.fileName,
+    );
+  }
+
+  void _handleDownload(BuildContext context) {
+    PolicyDocumentActions.downloadDocument(
+      context: context,
+      url: policy.fileUrl,
+      fileName: policy.fileName,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Card(
@@ -688,6 +713,7 @@ class _PolicyListTile extends StatelessWidget {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        onTap: () => _handleView(context),
         leading: Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
@@ -720,10 +746,53 @@ class _PolicyListTile extends StatelessWidget {
             ),
           ],
         ),
-        trailing: IconButton(
-          icon: const Icon(Icons.delete_outline, color: Colors.red),
-          tooltip: 'Delete Policy',
-          onPressed: onDelete,
+        trailing: PopupMenuButton<String>(
+          icon: const Icon(Icons.more_vert, color: Color(0xFF54046C)),
+          tooltip: 'Policy actions',
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          onSelected: (value) {
+            switch (value) {
+              case 'view':
+                _handleView(context);
+                break;
+              case 'download':
+                _handleDownload(context);
+                break;
+              case 'delete':
+                onDelete();
+                break;
+            }
+          },
+          itemBuilder: (context) => [
+            const PopupMenuItem(
+              value: 'view',
+              child: ListTile(
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                leading: Icon(Icons.visibility_outlined, color: Color(0xFF54046C)),
+                title: Text('View / Open'),
+              ),
+            ),
+            const PopupMenuItem(
+              value: 'download',
+              child: ListTile(
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                leading: Icon(Icons.download_outlined, color: Colors.blueGrey),
+                title: Text('Download'),
+              ),
+            ),
+            const PopupMenuDivider(),
+            const PopupMenuItem(
+              value: 'delete',
+              child: ListTile(
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                leading: Icon(Icons.delete_outline, color: Colors.red),
+                title: Text('Delete', style: TextStyle(color: Colors.red)),
+              ),
+            ),
+          ],
         ),
       ),
     );
