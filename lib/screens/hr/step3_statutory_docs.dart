@@ -1,4 +1,4 @@
-import 'package:almahub/screens/hr/employee_onboarding_models.dart';
+import 'package:almahub/models/employee_onboarding_models.dart';
 import 'package:almahub/screens/hr/onboarding_shared_widgets.dart';
 import 'package:flutter/material.dart';
 
@@ -27,8 +27,8 @@ class Step3StatutoryDocs extends StatelessWidget {
     String? kraPinCertificateUrl,
     String? nssfNumber,
     String? nssfConfirmationUrl,
-    String? nhifNumber,
-    String? nhifConfirmationUrl,
+    String? shifNumber,
+    String? shifConfirmationUrl,
     String? p9FormUrl,
   }) {
     return StatutoryDocuments(
@@ -38,9 +38,9 @@ class Step3StatutoryDocs extends StatelessWidget {
       nssfNumber: nssfNumber ?? statutoryDocs.nssfNumber,
       nssfConfirmationUrl:
           nssfConfirmationUrl ?? statutoryDocs.nssfConfirmationUrl,
-      nhifNumber: nhifNumber ?? statutoryDocs.nhifNumber,
-      nhifConfirmationUrl:
-          nhifConfirmationUrl ?? statutoryDocs.nhifConfirmationUrl,
+      shifNumber: shifNumber ?? statutoryDocs.shifNumber,
+      shifConfirmationUrl:
+          shifConfirmationUrl ?? statutoryDocs.shifConfirmationUrl,
       p9FormUrl: p9FormUrl ?? statutoryDocs.p9FormUrl,
     );
   }
@@ -57,7 +57,7 @@ class Step3StatutoryDocs extends StatelessWidget {
             const StepHeaderCard(
               icon: Icons.gavel_rounded,
               title: 'Statutory Documents',
-              subtitle: 'KRA, NSSF, NHIF & tax compliance documents',
+              subtitle: 'KRA, NSSF, SHIF & tax compliance documents',
             ),
             const SizedBox(height: 20),
 
@@ -116,27 +116,27 @@ class Step3StatutoryDocs extends StatelessWidget {
             ),
             const SizedBox(height: 16),
 
-            // ── NHIF / SHA ───────────────────────────────────────────────
+            // ── SHIF / SHA ───────────────────────────────────────────────
             FormSection(
-              title: 'NHIF / SHA',
+              title: 'SHIF / SHA',
               icon: Icons.health_and_safety_outlined,
               children: [
                 TextFormField(
-                  initialValue: statutoryDocs.nhifNumber,
-                  decoration: onboardingInputDecoration('NHIF / SHA Member Number *'),
+                  initialValue: statutoryDocs.shifNumber,
+                  decoration: onboardingInputDecoration('SHIF / SHA Member Number *'),
                   validator: (v) =>
-                      v == null || v.trim().isEmpty ? 'NHIF number is required' : null,
-                  onChanged: (v) => onChanged(_copy(nhifNumber: v)),
+                      v == null || v.trim().isEmpty ? 'SHIF number is required' : null,
+                  onChanged: (v) => onChanged(_copy(shifNumber: v)),
                 ),
                 const SizedBox(height: 14),
                 UploadFieldButton(
-                  label: 'NHIF Registration Confirmation',
-                  hint: 'NHIF confirmation letter or e-slip',
+                  label: 'SHIF Registration Confirmation',
+                  hint: 'SHIF confirmation letter or e-slip',
                   isRequired: true,
                   isUploading: isUploadingFile,
-                  uploadedUrl: statutoryDocs.nhifConfirmationUrl,
-                  onPressed: () => onUpload('nhif_confirmation', (url) {
-                    onChanged(_copy(nhifConfirmationUrl: url));
+                  uploadedUrl: statutoryDocs.shifConfirmationUrl,
+                  onPressed: () => onUpload('shif_confirmation', (url) {
+                    onChanged(_copy(shifConfirmationUrl: url));
                   }),
                 ),
               ],

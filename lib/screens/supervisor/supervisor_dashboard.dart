@@ -1,19 +1,24 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:logger/logger.dart';
-import 'hours_entry_dialog.dart';
+import '../../models/hours_models.dart';
+import '../../providers/hours_providers.dart';
+import '../../services/hours_service.dart';
+import 'hours_review_screen.dart';
+import 'supervisor_manual_hours_dialog.dart';
 import 'dart:async';
 
-class SupervisorDashboard extends StatefulWidget {
+class SupervisorDashboard extends ConsumerStatefulWidget {
   const SupervisorDashboard({super.key});
 
   @override
-  State<SupervisorDashboard> createState() => _SupervisorDashboardState();
+  ConsumerState<SupervisorDashboard> createState() => _SupervisorDashboardState();
 }
 
-class _SupervisorDashboardState extends State<SupervisorDashboard> {
+class _SupervisorDashboardState extends ConsumerState<SupervisorDashboard> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final User? _currentUser = FirebaseAuth.instance.currentUser;
   
@@ -25,10 +30,6 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
   
   // Selected month and year for hours tracking
   DateTime _selectedMonth = DateTime.now();
-  
-  // Track selected employees for forwarding
-  final Set<String> _selectedEmployees = {};
-  bool _isForwarding = false;
 
   // ============================================================================
   // ANTI-FLICKERING MECHANISM: Cache previous data to maintain display stability
@@ -193,9 +194,6 @@ static const double maxOvertimeBonus = 20.0;
           ),
         ],
       ),
-      floatingActionButton: _selectedEmployees.isNotEmpty
-          ? _buildForwardButton()
-          : null,
     );
   }
 
@@ -214,6 +212,7 @@ static const double maxOvertimeBonus = 20.0;
         ),
       ),
       actions: [
+        _buildReviewHoursAction(),
         IconButton(
           icon: const Icon(Icons.search, color: Colors.white),
           onPressed: _showSearchDialog,
@@ -231,6 +230,50 @@ static const double maxOvertimeBonus = 20.0;
         ),
         const SizedBox(width: 8),
       ],
+    );
+  }
+
+  /// AppBar action pushing the pending-hours review queue, badged with a
+  /// live count via Riverpod (`department == null` means "all departments,"
+  /// matching `_shouldShowAllDepartments()`).
+  Widget _buildReviewHoursAction() {
+    final department = _shouldShowAllDepartments() ? null : _supervisorDepartment;
+    final countAsync = ref.watch(pendingHoursCountProvider(department));
+    final count = countAsync.value ?? 0;
+
+    return Padding(
+      padding: const EdgeInsets.only(right: 4),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          IconButton(
+            icon: const Icon(Icons.fact_check, color: Colors.white),
+            tooltip: 'Review Hours',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => HoursReviewScreen(department: department)),
+              );
+            },
+          ),
+          if (count > 0)
+            Positioned(
+              right: 4,
+              top: 4,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                decoration: BoxDecoration(
+                  color: Colors.redAccent,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  count > 99 ? '99+' : '$count',
+                  style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 
@@ -489,7 +532,6 @@ static const double maxOvertimeBonus = 20.0;
                   _logger.i('Month changed to: ${DateFormat('MMMM yyyy').format(month)}');
                   setState(() {
                     _selectedMonth = month;
-                    _selectedEmployees.clear();
                     // Clear cache when month changes to force fresh data
                     _hasInitialData = false;
                   });
@@ -555,9 +597,10 @@ static const double maxOvertimeBonus = 20.0;
           
           if (hoursWorked > 0) {
             totalHours += hoursWorked;
-            
-            // Calculate daily overtime and sum it up
-            final overtime = _calculateMonthlyOvertimeFromDailyHours(hoursWorked, daysWorked);
+
+            // True per-day overtime, computed from approved DailyHours by
+            // _getEmployeeDetails (see HoursService.computeOvertimeHours).
+            final overtime = employee['overtimeHours'] as double? ?? 0.0;
             if (overtime > 0) {
               totalOvertime += overtime;
               employeesWithOvertime++;
@@ -869,7 +912,6 @@ static const double maxOvertimeBonus = 20.0;
                           headingRowHeight: 50,
                           dataRowMinHeight: 52,
                           dataRowMaxHeight: 52,
-                          showCheckboxColumn: true,
                           headingRowColor: WidgetStateProperty.all(
                             Colors.grey.shade100,
                           ),
@@ -914,10 +956,13 @@ static const double maxOvertimeBonus = 20.0;
                             final hoursWorked = monthlyData['hours'] as double;
                             final workQuality = monthlyData['quality'] as double;
                             final daysWorked = monthlyData['daysWorked'] as int;
-                            
-                            // Calculate overtime using DAILY logic
-                            final overtimeHours = _calculateMonthlyOvertimeFromDailyHours(hoursWorked, daysWorked);
-                            
+                            final documentId = employee['documentId'] as String?;
+                            final pendingCount = employee['pendingCount'] as int? ?? 0;
+
+                            // True per-day overtime, computed from approved
+                            // DailyHours entries by _getEmployeeDetails.
+                            final overtimeHours = employee['overtimeHours'] as double? ?? 0.0;
+
                             // Calculate REALISTIC performance metrics (45% hours + 55% quality + 20% OT bonus)
                             final performanceMetrics = _calculateRealisticPerformance(
                               hoursWorked: hoursWorked,
@@ -926,21 +971,8 @@ static const double maxOvertimeBonus = 20.0;
                               daysWorked: daysWorked,
                             );
 
-                            final isSelected = _selectedEmployees.contains(uid);
-
                             return DataRow(
                               key: ValueKey(uid), // Stable key for smooth updates
-                              selected: isSelected,
-                              onSelectChanged: (selected) {
-                                setState(() {
-                                  if (selected == true) {
-                                    _selectedEmployees.add(uid);
-                                  } else {
-                                    _selectedEmployees.remove(uid);
-                                  }
-                                });
-                                _logger.d('Employee ${selected == true ? "selected" : "deselected"}: $fullName');
-                              },
                               cells: [
                                 DataCell(Text('${index + 1}')),
                                 DataCell(
@@ -1021,19 +1053,45 @@ static const double maxOvertimeBonus = 20.0;
                                 ),
                                 DataCell(_buildOvertimeBadge(overtimeHours)),
                                 DataCell(_buildRealisticPerformanceBadge(performanceMetrics)),
-                                DataCell(_buildStatusBadge(status)),
+                                DataCell(_buildStatusBadge(status, pendingCount)),
                                 DataCell(
-                                  IconButton(
+                                  PopupMenuButton<String>(
                                     icon: const Icon(
-                                      Icons.add_circle,
+                                      Icons.more_vert,
                                       size: 20,
                                       color: Color.fromARGB(255, 123, 31, 162),
                                     ),
-                                    onPressed: () {
-                                      _logger.i('Log hours for: $uid ($fullName)');
-                                      _showHoursEntryDialog(uid, fullName, department);
+                                    onSelected: (value) {
+                                      if (value == 'history') {
+                                        if (documentId != null) {
+                                          _showEmployeeHistoryDialog(documentId, fullName);
+                                        }
+                                      } else if (value == 'manual') {
+                                        _showManualHoursDialog(uid, fullName);
+                                      }
                                     },
-                                    tooltip: 'Log Hours',
+                                    itemBuilder: (context) => [
+                                      const PopupMenuItem(
+                                        value: 'history',
+                                        child: Row(
+                                          children: [
+                                            Icon(Icons.history, size: 18),
+                                            SizedBox(width: 8),
+                                            Text('View History'),
+                                          ],
+                                        ),
+                                      ),
+                                      const PopupMenuItem(
+                                        value: 'manual',
+                                        child: Row(
+                                          children: [
+                                            Icon(Icons.edit_calendar, size: 18),
+                                            SizedBox(width: 8),
+                                            Text('Manual Entry'),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ],
@@ -1155,22 +1213,6 @@ static const double maxOvertimeBonus = 20.0;
               ],
             ),
           ),
-          if (_selectedEmployees.isNotEmpty)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text(
-                '${_selectedEmployees.length} selected',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                ),
-              ),
-            ),
         ],
       ),
     );
@@ -1466,10 +1508,10 @@ static const double maxOvertimeBonus = 20.0;
     );
   }
 
-  Widget _buildStatusBadge(String status) {
+  Widget _buildStatusBadge(String status, [int pendingHoursCount = 0]) {
     Color color;
     String text;
-    
+
     switch (status) {
       case 'approved':
         color = Colors.green;
@@ -1487,47 +1529,39 @@ static const double maxOvertimeBonus = 20.0;
         color = Colors.grey;
         text = 'Draft';
     }
-    
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Text(
-        text,
-        style: TextStyle(
-          color: color,
-          fontWeight: FontWeight.w600,
-          fontSize: 12,
-        ),
-      ),
-    );
-  }
 
-  Widget _buildForwardButton() {
-    return FloatingActionButton.extended(
-      onPressed: _isForwarding ? null : _forwardHoursToAccountant,
-      backgroundColor: _isForwarding
-          ? Colors.grey.shade400
-          : const Color.fromARGB(255, 123, 31, 162),
-      foregroundColor: Colors.white,
-      icon: _isForwarding
-          ? const SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-              ),
-            )
-          : const Icon(Icons.send),
-      label: Text(
-        _isForwarding
-            ? 'Forwarding...'
-            : 'Forward to Accountant (${_selectedEmployees.length})',
-        style: const TextStyle(fontWeight: FontWeight.w600),
-      ),
+    return Wrap(
+      spacing: 6,
+      runSpacing: 4,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Text(
+            text,
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.w600,
+              fontSize: 12,
+            ),
+          ),
+        ),
+        if (pendingHoursCount > 0)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.blueAccent.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(
+              '$pendingHoursCount hrs pending',
+              style: const TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.w600, fontSize: 11),
+            ),
+          ),
+      ],
     );
   }
 
@@ -1558,7 +1592,7 @@ static const double maxOvertimeBonus = 20.0;
               if (memberData == null) continue;
               
               // Fetch additional employee details from EmployeeDetails
-              final employeeDetails = await _getEmployeeDetails(uid);
+              final employeeDetails = await _getEmployeeDetails(uid, DateFormat('yyyy-MM').format(_selectedMonth));
               
               allEmployees.add({
                 'uid': uid,
@@ -1608,7 +1642,7 @@ static const double maxOvertimeBonus = 20.0;
             if (memberData == null) continue;
             
             // Fetch additional employee details
-            final employeeDetails = await _getEmployeeDetails(uid);
+            final employeeDetails = await _getEmployeeDetails(uid, DateFormat('yyyy-MM').format(_selectedMonth));
             
             employees.add({
               'uid': uid,
@@ -1629,9 +1663,10 @@ static const double maxOvertimeBonus = 20.0;
     }
   }
 
-  Future<Map<String, dynamic>> _getEmployeeDetails(String uid) async {
+  Future<Map<String, dynamic>> _getEmployeeDetails(String uid, String monthKey) async {
     try {
-      // Try EmployeeDetails first
+      // Draft and submitted onboarding records both live in EmployeeDetails
+      // now — `status` distinguishes them, not the collection.
       final employeeQuery = await _firestore
           .collection('EmployeeDetails')
           .where('uid', isEqualTo: uid)
@@ -1639,26 +1674,11 @@ static const double maxOvertimeBonus = 20.0;
           .get();
 
       String? documentId;
-      String? collectionName;
       Map<String, dynamic>? data;
 
       if (employeeQuery.docs.isNotEmpty) {
         documentId = employeeQuery.docs.first.id;
-        collectionName = 'EmployeeDetails';
         data = employeeQuery.docs.first.data();
-      } else {
-        // Try Draft collection
-        final draftQuery = await _firestore
-            .collection('Draft')
-            .where('uid', isEqualTo: uid)
-            .limit(1)
-            .get();
-
-        if (draftQuery.docs.isNotEmpty) {
-          documentId = draftQuery.docs.first.id;
-          collectionName = 'Draft';
-          data = draftQuery.docs.first.data();
-        }
       }
 
       if (data == null) {
@@ -1669,6 +1689,8 @@ static const double maxOvertimeBonus = 20.0;
           'hoursWorked': {},
           'workQuality': {},
           'daysWorked': {},
+          'overtimeHours': 0.0,
+          'pendingCount': 0,
         };
       }
 
@@ -1706,17 +1728,46 @@ static const double maxOvertimeBonus = 20.0;
         }
       }
 
+      // True per-day overtime + pending count from this month's DailyHours
+      // entries — approved-only, matching what payroll will actually see.
+      double overtimeHours = 0.0;
+      int pendingCount = 0;
+      if (documentId != null) {
+        final dailySnapshot = await _firestore
+            .collection('EmployeeDetails')
+            .doc(documentId)
+            .collection('DailyHours')
+            .where('monthKey', isEqualTo: monthKey)
+            .get();
+
+        final approvedEntries = <DailyHoursEntry>[];
+        for (final doc in dailySnapshot.docs) {
+          final entryData = doc.data();
+          if (entryData['status'] == HoursEntryStatus.pending) {
+            pendingCount++;
+          } else if (entryData['status'] == HoursEntryStatus.approved) {
+            approvedEntries.add(DailyHoursEntry.fromMap(entryData, doc.id));
+          }
+        }
+        overtimeHours = HoursService.computeOvertimeHours(
+          approvedEntries: approvedEntries,
+          standardHoursPerDay: standardWorkHoursPerDay,
+          maxHoursPerDay: maxHoursPerDay,
+        );
+      }
+
       final details = {
-        'jobTitle': data['employmentDetails']?['jobTitle'] ?? 
+        'jobTitle': data['employmentDetails']?['jobTitle'] ??
                   data['employmentInfo']?['jobTitle'] ?? '-',
-        'employmentType': data['employmentDetails']?['employmentType'] ?? 
+        'employmentType': data['employmentDetails']?['employmentType'] ??
                         data['employmentInfo']?['employmentType'] ?? '-',
-        'status': data['status'] ?? (collectionName == 'Draft' ? 'draft' : 'submitted'),
+        'status': data['status'] ?? 'draft',
         'hoursWorked': hoursWorked,
         'workQuality': workQuality,
         'daysWorked': daysWorked,
         'documentId': documentId,
-        'collectionName': collectionName,
+        'overtimeHours': overtimeHours,
+        'pendingCount': pendingCount,
       };
 
       return details;
@@ -1730,6 +1781,8 @@ static const double maxOvertimeBonus = 20.0;
         'hoursWorked': {},
         'workQuality': {},
         'daysWorked': {},
+        'overtimeHours': 0.0,
+        'pendingCount': 0,
       };
     }
   }
@@ -1773,34 +1826,6 @@ static const double maxOvertimeBonus = 20.0;
     
     final value = dataMap[monthKey];
     return value is num ? value.toDouble() : 0.0;
-  }
-
-  /// ============================================================================
-  /// DAILY-BASED OVERTIME CALCULATION
-  /// Standard: 8 hours/day, Maximum: 12 hours/day (4 hours OT max)
-  /// ============================================================================
-  double _calculateMonthlyOvertimeFromDailyHours(double totalMonthlyHours, int daysWorked) {
-    if (totalMonthlyHours <= 0 || daysWorked <= 0) {
-      return 0.0;
-    }
-    
-    // Calculate average hours per day
-    final avgHoursPerDay = totalMonthlyHours / daysWorked;
-    
-    double overtimePerDay = 0.0;
-    
-if (avgHoursPerDay <= standardWorkHoursPerDay) {
-  overtimePerDay = 0.0;
-} else if (avgHoursPerDay <= maxHoursPerDay) {
-  overtimePerDay = avgHoursPerDay - standardWorkHoursPerDay;
-} else {
-  overtimePerDay = maxOvertimeHoursPerDay;
-}
-    
-    // Calculate total monthly overtime
-    final totalMonthlyOvertime = overtimePerDay * daysWorked;
-    
-    return totalMonthlyOvertime;
   }
 
   /// ============================================================================
@@ -1993,144 +2018,122 @@ if (avgHoursPerDay <= standardWorkHoursPerDay) {
     );
   }
 
-  Future<void> _forwardHoursToAccountant() async {
-    if (_selectedEmployees.isEmpty) {
-      _logger.w('No employees selected for forwarding');
-      return;
-    }
+  void _showManualHoursDialog(String uid, String employeeName) {
+    _logger.i('Opening manual hours dialog for: $employeeName (UID: $uid)');
 
-    _logger.i('=== FORWARDING HOURS TO ACCOUNTANT ===');
-    _logger.i('Selected employees: ${_selectedEmployees.length}');
-    _logger.i('Month: ${DateFormat('MMMM yyyy').format(_selectedMonth)}');
-
-    setState(() => _isForwarding = true);
-
-    try {
-      final employeeDataList = <Map<String, dynamic>>[];
-      
-      // Get current employees data
-      final currentEmployees = await _getEmployeesDataStream().first;
-      
-      for (final uid in _selectedEmployees) {
-        final employee = currentEmployees.firstWhere(
-          (e) => e['uid'] == uid,
-          orElse: () => <String, dynamic>{},
-        );
-        
-        if (employee.isNotEmpty) {
-          final monthlyData = _getMonthlyData(employee);
-          final hoursWorked = monthlyData['hours'] as double;
-          final daysWorked = monthlyData['daysWorked'] as int;
-          final workQuality = monthlyData['quality'] as double;
-          
-          final overtimeHours = _calculateMonthlyOvertimeFromDailyHours(hoursWorked, daysWorked);
-          
-          final performanceMetrics = _calculateRealisticPerformance(
-            hoursWorked: hoursWorked,
-            workQuality: workQuality,
-            employmentType: employee['employmentType'] ?? 'Full-Time',
-            daysWorked: daysWorked,
-          );
-          
-          employeeDataList.add({
-            'employeeId': uid,
-            'fullName': employee['fullName'] ?? 'Unknown',
-            'email': employee['email'] ?? 'Unknown',
-            'department': employee['department'] ?? 'Unknown',
-            'jobTitle': employee['jobTitle'] ?? 'Unknown',
-            'employmentType': employee['employmentType'] ?? 'Full-Time',
-            'hoursWorked': hoursWorked,
-            'overtimeHours': overtimeHours,
-            'daysWorked': daysWorked,
-            'workQuality': workQuality,
-            'performance': performanceMetrics['monthlyPerformance'],
-            'month': DateFormat('yyyy-MM').format(_selectedMonth),
-            'monthDisplay': DateFormat('MMMM yyyy').format(_selectedMonth),
-          });
-        }
-      }
-
-      await _firestore.collection('HoursForwarded').add({
-        'supervisorId': _currentUser!.uid,
-        'supervisorName': _supervisorName,
-        'supervisorEmail': _currentUser.email,
-        'supervisorRole': _currentUserRole,
-        'department': _supervisorDepartment ?? 'All Departments',
-        'month': DateFormat('yyyy-MM').format(_selectedMonth),
-        'monthDisplay': DateFormat('MMMM yyyy').format(_selectedMonth),
-        'employees': employeeDataList,
-        'forwardedAt': FieldValue.serverTimestamp(),
-        'status': 'pending',
-        'totalEmployees': employeeDataList.length,
-        'totalHours': employeeDataList.fold<double>(
-          0,
-          (total, emp) => total + (emp['hoursWorked'] as double),
-        ),
-        'totalOvertime': employeeDataList.fold<double>(
-          0,
-          (total, emp) => total + (emp['overtimeHours'] as double),
-        ),
-        'avgPerformance': employeeDataList.isNotEmpty
-            ? employeeDataList.fold<double>(
-                0,
-                (total, emp) => total + (emp['performance'] as double),
-              ) / employeeDataList.length
-            : 0.0,
-      });
-
-      _logger.i('✅ Hours forwarded successfully to Accountant');
-
-      if (!mounted) return;
-
-      setState(() {
-        _selectedEmployees.clear();
-        _isForwarding = false;
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Successfully forwarded hours for ${employeeDataList.length} employees to Accountant',
-          ),
-          backgroundColor: Colors.green,
-          duration: const Duration(seconds: 4),
-        ),
-      );
-
-    } catch (e, stackTrace) {
-      _logger.e('❌ Error forwarding hours', error: e, stackTrace: stackTrace);
-
-      if (!mounted) return;
-
-      setState(() => _isForwarding = false);
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error forwarding hours: $e'),
-          backgroundColor: Colors.red,
-          duration: const Duration(seconds: 5),
-        ),
-      );
-    }
-  }
-
-  void _showHoursEntryDialog(String uid, String employeeName, String department) {
-    _logger.i('Opening hours entry dialog for: $employeeName (UID: $uid)');
-    
     showDialog(
       context: context,
-      builder: (context) => HoursEntryDialog(
+      builder: (context) => SupervisorManualHoursDialog(
         employeeId: uid,
         employeeName: employeeName,
-        department: department,
       ),
     ).then((saved) {
       if (saved == true) {
-        _logger.i('Hours saved, refreshing dashboard');
-        // Don't clear cache - let stream update naturally
+        _logger.i('Manual entry saved, refreshing dashboard');
         setState(() {});
       }
     });
+  }
+
+  /// Read-only day-by-day history (approved/pending/rejected) for one
+  /// employee/month — the closest equivalent of the old direct-entry
+  /// dialog, now purely informational since actual submission happens on
+  /// the employee side and approval happens via the Review Hours screen.
+  void _showEmployeeHistoryDialog(String documentId, String employeeName) {
+    final monthKey = DateFormat('yyyy-MM').format(_selectedMonth);
+
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: SizedBox(
+          width: 520,
+          height: 520,
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(employeeName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                          Text(
+                            DateFormat('MMMM yyyy').format(_selectedMonth),
+                            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              Expanded(
+                child: StreamBuilder<List<DailyHoursEntry>>(
+                  stream: HoursService().dailyEntriesStream(documentId, monthKey),
+                  builder: (context, snapshot) {
+                    if (!snapshot.hasData) {
+                      return const Center(child: CircularProgressIndicator(color: Color.fromARGB(255, 123, 31, 162)));
+                    }
+                    final entries = snapshot.data!;
+                    if (entries.isEmpty) {
+                      return const Center(child: Text('No entries this month', style: TextStyle(color: Colors.grey)));
+                    }
+                    return ListView.separated(
+                      padding: const EdgeInsets.all(8),
+                      itemCount: entries.length,
+                      separatorBuilder: (context, index) => const Divider(height: 1),
+                      itemBuilder: (context, index) {
+                        final entry = entries[index];
+                        return ListTile(
+                          title: Text(
+                            '${DateFormat('MMM d, yyyy').format(entry.date)} — ${entry.hours.toStringAsFixed(2)} hrs',
+                            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                          ),
+                          subtitle: Text(
+                            '${entry.entryTime} → ${entry.exitTime}'
+                            '${entry.isSupervisorEntered ? ' · Entered by Supervisor' : ''}'
+                            '${entry.rejectionReason != null ? ' · Rejected: ${entry.rejectionReason}' : ''}',
+                            style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                          ),
+                          trailing: _buildHoursStatusChip(entry.status),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHoursStatusChip(String status) {
+    Color color;
+    switch (status) {
+      case HoursEntryStatus.approved:
+        color = Colors.green;
+        break;
+      case HoursEntryStatus.rejected:
+        color = Colors.red;
+        break;
+      default:
+        color = Colors.orange;
+    }
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(6)),
+      child: Text(
+        status[0].toUpperCase() + status.substring(1),
+        style: TextStyle(color: color, fontWeight: FontWeight.w600, fontSize: 11),
+      ),
+    );
   }
 
   Widget _buildAccessDeniedScreen() {

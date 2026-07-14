@@ -10,6 +10,7 @@ import 'package:almahub/screens/hr/Policy%20Management/company_policy_model.dart
 import 'package:almahub/screens/hr/Policy%20Management/policy_status_model.dart';
 import 'package:almahub/screens/hr/Policy%20Management/policy_service.dart';
 import 'package:almahub/screens/hr/Policy%20Management/hr_policy_management_screen.dart';
+import 'package:almahub/screens/hr/Payroll/hr_payroll_management_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -31,7 +32,10 @@ const Map<String, String> _kDocumentLabels = {
   // Step 3 — Statutory
   'kra_pin': 'KRA PIN Certificate',
   'nssf_confirmation': 'NSSF Confirmation',
-  'nhif_confirmation': 'NHIF Confirmation',
+  'shif_confirmation': 'SHIF Confirmation',
+  // Legacy key from before NHIF was replaced by SHIF/SHA — kept so older
+  // uploaded documents still display a friendly label.
+  'nhif_confirmation': 'SHIF Confirmation',
   'p9_form': 'P9 Form',
   // Step 5 — Academic & Professional
   'academic_cert': 'Academic Certificate',
@@ -50,6 +54,7 @@ const Map<String, IconData> _kDocumentIcons = {
   'id_document': Icons.badge_outlined,
   'kra_pin': Icons.receipt_long_outlined,
   'nssf_confirmation': Icons.verified_user_outlined,
+  'shif_confirmation': Icons.health_and_safety_outlined,
   'nhif_confirmation': Icons.health_and_safety_outlined,
   'p9_form': Icons.description_outlined,
   'academic_cert': Icons.school_outlined,
@@ -989,7 +994,7 @@ class HRDashboard extends StatefulWidget {
 
 class _HRDashboardState extends State<HRDashboard> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  String _statusFilter = 'draft';
+  String _statusFilter = 'all';
   bool _isDownloading = false;
   String? _downloadProgress;
   String _searchQuery = '';
@@ -1082,6 +1087,21 @@ class _HRDashboardState extends State<HRDashboard> {
           ),
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.payments,
+                color: Color.fromARGB(255, 242, 241, 243)),
+            onPressed: () {
+              _logger.i('Navigating to Payroll Management');
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const HRPayrollManagementScreen(),
+                ),
+              );
+            },
+            tooltip: 'Manage Payroll',
+          ),
+          const SizedBox(width: 4),
           IconButton(
             icon: const Icon(Icons.policy,
                 color: Color.fromARGB(255, 242, 241, 243)),
@@ -1259,8 +1279,8 @@ class _HRDashboardState extends State<HRDashboard> {
   // ── Stats cards ────────────────────────────────────────────────────────────
   Widget _buildStatsCards() {
     _logger.d('Building stats cards with filter: $_statusFilter');
-    return StreamBuilder<QuerySnapshot>(
-      stream: _getStatsStream(),
+    return StreamBuilder<List<QueryDocumentSnapshot>>(
+      stream: _getEmployeeDetailsStream(),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
           _logger.e('Error in stats stream', error: snapshot.error);
@@ -1271,21 +1291,21 @@ class _HRDashboardState extends State<HRDashboard> {
           return const SizedBox.shrink();
         }
 
-        final docs = snapshot.data!.docs;
+        final docs = snapshot.data!
+            .where((doc) => _matchesStatusFilter(doc.data() as Map<String, dynamic>))
+            .toList();
         _logger.d('Stats loaded: ${docs.length} documents in current view');
 
         final total = docs.length;
         int submitted = 0, drafts = 0;
 
-        if (_statusFilter == 'draft') {
-          drafts = total;
-        } else {
-          for (var doc in docs) {
-            final data = doc.data() as Map<String, dynamic>;
-            final status = data['status'] ?? 'submitted';
-            if (status == 'submitted') {
-              submitted++;
-            }
+        for (var doc in docs) {
+          final data = doc.data() as Map<String, dynamic>;
+          final status = data['status'] ?? 'draft';
+          if (status == 'draft') {
+            drafts++;
+          } else {
+            submitted++;
           }
         }
 
@@ -1308,14 +1328,17 @@ class _HRDashboardState extends State<HRDashboard> {
                         const Color.fromARGB(255, 209, 72, 221),
                         Icons.people, cardWidth),
                     SizedBox(width: spacing),
-                    if (_statusFilter == 'draft')
+                    if (_statusFilter != 'submitted') ...[
                       _buildStatCard('Drafts', drafts,
                           const Color.fromARGB(255, 213, 97, 217),
-                          Icons.drafts, cardWidth)
-                    else
+                          Icons.drafts, cardWidth),
+                      SizedBox(width: spacing),
+                    ],
+                    if (_statusFilter != 'draft') ...[
                       _buildStatCard('Submitted', submitted, Colors.orange,
                           Icons.pending, cardWidth),
-                    SizedBox(width: spacing),
+                      SizedBox(width: spacing),
+                    ],
                     _buildFilterCard(cardWidth),
                   ],
                 ),
@@ -1429,6 +1452,22 @@ class _HRDashboardState extends State<HRDashboard> {
         icon: Icon(Icons.arrow_drop_down, size: iconSize + 2),
         items: [
           DropdownMenuItem(
+            value: 'all',
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.people_alt,
+                    size: iconSize,
+                    color: const Color.fromARGB(255, 86, 10, 119)),
+                SizedBox(width: horizontalPadding * 0.4),
+                Flexible(
+                    child: Text('All',
+                        style: TextStyle(fontSize: textSize),
+                        overflow: TextOverflow.ellipsis)),
+              ],
+            ),
+          ),
+          DropdownMenuItem(
             value: 'draft',
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -1491,8 +1530,8 @@ class _HRDashboardState extends State<HRDashboard> {
             children: [
               _buildTableHeader(screenWidth),
               Expanded(
-                child: StreamBuilder<QuerySnapshot>(
-                  stream: _getFilteredStream(),
+                child: StreamBuilder<List<QueryDocumentSnapshot>>(
+                  stream: _getEmployeeDetailsStream(),
                   builder: (context, snapshot) {
                     if (snapshot.hasError) {
                       _logger.e('Error in employee table stream',
@@ -1504,9 +1543,11 @@ class _HRDashboardState extends State<HRDashboard> {
                       return const Center(child: CircularProgressIndicator());
                     }
 
-                    final allEmployees = snapshot.data!.docs;
+                    final allEmployees = snapshot.data!
+                        .where((doc) => _matchesStatusFilter(doc.data() as Map<String, dynamic>))
+                        .toList();
                     _logger.i(
-                        'Loaded ${allEmployees.length} employees from ${_getCollectionName()} collection');
+                        'Loaded ${allEmployees.length} employees matching filter "$_statusFilter"');
 
                     final employees = _searchQuery.isEmpty
                         ? allEmployees
@@ -1614,7 +1655,7 @@ class _HRDashboardState extends State<HRDashboard> {
                                 const DataColumn(label: Text('Start Date')),
                                 const DataColumn(label: Text('KRA PIN')),
                                 const DataColumn(label: Text('NSSF Number')),
-                                const DataColumn(label: Text('NHIF Number')),
+                                const DataColumn(label: Text('SHIF Number')),
                                 const DataColumn(label: Text('Basic Salary')),
                                 const DataColumn(label: Text('Bank Name')),
                                 const DataColumn(label: Text('Account Number')),
@@ -1734,7 +1775,8 @@ class _HRDashboardState extends State<HRDashboard> {
                                         data['statutoryDocs']?['nssfNumber'] ??
                                             '-')),
                                     DataCell(Text(
-                                        data['statutoryDocs']?['nhifNumber'] ??
+                                        data['statutoryDocs']?['shifNumber'] ??
+                                            data['statutoryDocs']?['nhifNumber'] ??
                                             '-')),
                                     DataCell(Text(
                                       data['payrollDetails']?['basicSalary'] !=
@@ -1810,15 +1852,13 @@ class _HRDashboardState extends State<HRDashboard> {
                                                       HREmployeeOnboardingScreen(
                                                     employeeId: doc.id,
                                                     initialData: data,
-                                                    collectionSource:
-                                                        _getCollectionName(),
                                                   ),
                                                 ),
                                               );
                                             },
                                             tooltip: 'Edit Onboarding',
                                           ),
-                                          if (_statusFilter == 'draft')
+                                          if (data['status'] == 'draft')
                                             IconButton(
                                               icon: const Icon(
                                                   Icons.delete_outline,
@@ -1831,29 +1871,6 @@ class _HRDashboardState extends State<HRDashboard> {
                                               },
                                               tooltip: 'Remove User',
                                             ),
-                                          if (_statusFilter == 'submitted' &&
-                                              data['status'] == 'submitted') ...[
-                                            IconButton(
-                                              icon: const Icon(Icons.check_circle,
-                                                  size: 20, color: Colors.green),
-                                              onPressed: () {
-                                                _logger.i(
-                                                    'Approve button clicked for employee: ${doc.id}');
-                                                _approveEmployee(doc.id);
-                                              },
-                                              tooltip: 'Approve',
-                                            ),
-                                            IconButton(
-                                              icon: const Icon(Icons.cancel,
-                                                  size: 20, color: Colors.red),
-                                              onPressed: () {
-                                                _logger.i(
-                                                    'Reject button clicked for employee: ${doc.id}');
-                                                _rejectEmployee(doc.id);
-                                              },
-                                              tooltip: 'Reject',
-                                            ),
-                                          ],
                                         ],
                                       ),
                                     ),
@@ -2072,7 +2089,9 @@ class _HRDashboardState extends State<HRDashboard> {
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
-              _statusFilter == 'draft' ? 'DRAFT VIEW' : 'SUBMITTED VIEW',
+              _statusFilter == 'all'
+                  ? 'ALL EMPLOYEES'
+                  : (_statusFilter == 'draft' ? 'DRAFT VIEW' : 'SUBMITTED VIEW'),
               style: TextStyle(
                 fontSize: badgeTextSize,
                 fontWeight: FontWeight.w700,
@@ -2087,25 +2106,40 @@ class _HRDashboardState extends State<HRDashboard> {
   }
 
   // ── Firestore helpers ──────────────────────────────────────────────────────
-  String _getCollectionName() =>
-      _statusFilter == 'draft' ? 'Draft' : 'EmployeeDetails';
-
-  Stream<QuerySnapshot> _getStatsStream() {
-    final collectionName = _getCollectionName();
-    _logger.d('Getting stats stream from $collectionName collection');
-    return _firestore
-        .collection(collectionName)
-        .orderBy('createdAt', descending: true)
-        .snapshots();
+  //
+  // All onboarding records — draft or fully submitted — live in the single
+  // `EmployeeDetails` collection; the Draft/Submitted tab toggle is a
+  // client-side filter on the `status` field, not a choice of collection.
+  // Filtering client-side (rather than `.where('status', ...)`) avoids
+  // needing a new composite Firestore index for the combined
+  // status-filter + createdAt-order query, matching the pattern already
+  // used elsewhere in this codebase (e.g. PayrollService).
+  /// Deliberately does NOT use `.orderBy('createdAt', ...)` — Firestore
+  /// excludes any document missing the order-by field from the result set
+  /// entirely (silently, no error), which was previously hiding employee
+  /// records created through a path that didn't set `createdAt` (e.g. an
+  /// older onboarding write, a manual console entry, or a migrated record).
+  /// Sorting is done client-side instead so every `EmployeeDetails` doc is
+  /// always shown, regardless of whether it has a `createdAt` timestamp.
+  Stream<List<QueryDocumentSnapshot>> _getEmployeeDetailsStream() {
+    return _firestore.collection('EmployeeDetails').snapshots().map((snapshot) {
+      final docs = snapshot.docs.toList();
+      docs.sort((a, b) {
+        final aTime = a.data()['createdAt'] as Timestamp?;
+        final bTime = b.data()['createdAt'] as Timestamp?;
+        if (aTime == null && bTime == null) return 0;
+        if (aTime == null) return 1; // docs without createdAt sort last
+        if (bTime == null) return -1;
+        return bTime.compareTo(aTime); // descending
+      });
+      return docs;
+    });
   }
 
-  Stream<QuerySnapshot> _getFilteredStream() {
-    final collectionName = _getCollectionName();
-    _logger.i('Creating filtered stream for $collectionName collection');
-    return _firestore
-        .collection(collectionName)
-        .orderBy('createdAt', descending: true)
-        .snapshots();
+  bool _matchesStatusFilter(Map<String, dynamic> data) {
+    if (_statusFilter == 'all') return true;
+    final status = data['status'] ?? 'draft';
+    return _statusFilter == 'draft' ? status == 'draft' : status != 'draft';
   }
 
   // ── Status badge ───────────────────────────────────────────────────────────
@@ -2220,9 +2254,9 @@ class _HRDashboardState extends State<HRDashboard> {
 
     if (confirm == true) {
       try {
-        _logger.i('Deleting employee draft...');
-        await _firestore.collection(_getCollectionName()).doc(id).delete();
-        _logger.i('✅ Employee draft deleted successfully');
+        _logger.i('Deleting employee record...');
+        await _firestore.collection('EmployeeDetails').doc(id).delete();
+        _logger.i('✅ Employee record deleted successfully');
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -2247,114 +2281,6 @@ class _HRDashboardState extends State<HRDashboard> {
     }
   }
 
-  // ── Approve / Reject ────────────────────────────────────────────────────────
-  Future<void> _approveEmployee(String id) async {
-    _logger.i('=== APPROVE EMPLOYEE INITIATED ===');
-
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Approve Application'),
-        content:
-            const Text('Are you sure you want to approve this application?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style:
-                ElevatedButton.styleFrom(backgroundColor: Colors.green),
-            child: const Text('Approve'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirm == true) {
-      try {
-        await _firestore.collection('EmployeeDetails').doc(id).update({
-          'status': 'approved',
-          'updatedAt': FieldValue.serverTimestamp(),
-        });
-        _logger.i('✅ Employee approved successfully');
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Application approved successfully!'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        }
-      } catch (e, stackTrace) {
-        _logger.e('❌ ERROR APPROVING EMPLOYEE',
-            error: e, stackTrace: stackTrace);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error approving application: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      }
-    }
-  }
-
-  Future<void> _rejectEmployee(String id) async {
-    _logger.i('=== REJECT EMPLOYEE INITIATED ===');
-
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Reject Application'),
-        content:
-            const Text('Are you sure you want to reject this application?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Reject'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirm == true) {
-      try {
-        await _firestore.collection('EmployeeDetails').doc(id).update({
-          'status': 'rejected',
-          'updatedAt': FieldValue.serverTimestamp(),
-        });
-        _logger.i('✅ Employee rejected successfully');
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Application rejected'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      } catch (e, stackTrace) {
-        _logger.e('❌ ERROR REJECTING EMPLOYEE',
-            error: e, stackTrace: stackTrace);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error rejecting application: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      }
-    }
-  }
-
   // ── Excel download (unchanged) ─────────────────────────────────────────────
   Future<void> _downloadExcel() async {
     _logger.i('=== EXCEL DOWNLOAD INITIATED ===');
@@ -2367,28 +2293,28 @@ class _HRDashboardState extends State<HRDashboard> {
     String? downloadedFilePath;
 
     try {
-      final collectionName = _getCollectionName();
-      _logger.i('Fetching data from $collectionName collection...');
+      _logger.i('Fetching data from EmployeeDetails (filter: $_statusFilter)...');
 
       if (mounted) setState(() => _downloadProgress = 'Loading employees...');
 
-      final snapshot =
-          await _firestore.collection(collectionName).get();
-      _logger.i(
-          'Fetched ${snapshot.docs.length} documents from $collectionName');
+      final fullSnapshot = await _firestore.collection('EmployeeDetails').get();
+      final docs = fullSnapshot.docs
+          .where((doc) => _matchesStatusFilter(doc.data()))
+          .toList();
+      _logger.i('Fetched ${docs.length} documents matching filter "$_statusFilter"');
 
-      if (snapshot.docs.isEmpty) {
-        throw Exception('No employee data found in $collectionName');
+      if (docs.isEmpty) {
+        throw Exception('No employee data found for filter "$_statusFilter"');
       }
 
       if (mounted) {
         setState(() =>
             _downloadProgress =
-                'Processing ${snapshot.docs.length} records...');
+                'Processing ${docs.length} records...');
       }
 
       final employees = <EmployeeOnboarding>[];
-      for (var doc in snapshot.docs) {
+      for (var doc in docs) {
         try {
           final employee = EmployeeOnboarding.fromMap(doc.data());
           employees.add(employee);

@@ -5,13 +5,18 @@ import 'package:almahub/screens/role_selection_screen.dart';
 import 'package:almahub/screens/settings_screen.dart';
 import 'package:almahub/screens/hr/hr_dashboard.dart';
 import 'package:almahub/screens/supervisor/supervisor_dashboard.dart';
+import 'package:almahub/screens/accountant/accountant_dashboard.dart';
 import 'package:almahub/screens/hr/Policy%20Management/company_policy_model.dart';
 import 'package:almahub/screens/hr/Policy%20Management/policy_status_model.dart';
 import 'package:almahub/screens/hr/Policy%20Management/policy_service.dart';
 import 'package:almahub/screens/hr/Policy%20Management/policy_document_actions.dart';
 // PolicyViewerScreen replaced by _openDocument() — same viewer approach as DrawingsScreen
 // import 'package:almahub/screens/hr/Policy%20Management/policy_viewer_screen.dart';
+import 'package:almahub/screens/hr/Payroll/payroll_document_actions.dart';
+import 'package:almahub/screens/hr/Payroll/payroll_models.dart';
+import 'package:almahub/screens/hr/Payroll/payroll_providers.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -264,6 +269,8 @@ class _EmployeeDashboardState extends State<EmployeeDashboard>
       return;
     }
     try {
+      // Draft and submitted onboarding records both live in EmployeeDetails
+      // now — `status` distinguishes them, not the collection.
       final detailsSnap = await _firestore
           .collection('EmployeeDetails')
           .where('uid', isEqualTo: currentUser.uid)
@@ -271,21 +278,6 @@ class _EmployeeDashboardState extends State<EmployeeDashboard>
           .get();
       if (detailsSnap.docs.isNotEmpty) {
         final data = detailsSnap.docs.first.data();
-        if (mounted) {
-          setState(() {
-            _employeeData = EmployeeOnboarding.fromMap(data);
-            _isLoadingEmployee = false;
-          });
-        }
-        return;
-      }
-      final draftSnap = await _firestore
-          .collection('Draft')
-          .where('uid', isEqualTo: currentUser.uid)
-          .limit(1)
-          .get();
-      if (draftSnap.docs.isNotEmpty) {
-        final data = draftSnap.docs.first.data();
         if (mounted) {
           setState(() {
             _employeeData = EmployeeOnboarding.fromMap(data);
@@ -1741,8 +1733,8 @@ class _EmployeeDashboardState extends State<EmployeeDashboard>
                 ),
                 _buildInfoCard(
                   icon: Icons.local_hospital_outlined,
-                  label: 'NHIF Identification',
-                  value: emp.statutoryDocs.nhifNumber,
+                  label: 'SHIF Identification',
+                  value: emp.statutoryDocs.shifNumber,
                   color: Colors.purple,
                 ),
               ]),
@@ -1759,13 +1751,17 @@ class _EmployeeDashboardState extends State<EmployeeDashboard>
                 _buildInfoCard(
                   icon: Icons.account_balance_rounded,
                   label: 'Bank Entity Affiliation',
-                  value: emp.payrollDetails.bankDetails?.bankName ?? 'N/A',
+                  value: emp.payrollDetails.bankDetails.bankName.isEmpty
+                      ? 'N/A'
+                      : emp.payrollDetails.bankDetails.bankName,
                   color: Colors.green,
                 ),
                 _buildInfoCard(
                   icon: Icons.credit_card_outlined,
                   label: 'Account Destination Number',
-                  value: emp.payrollDetails.bankDetails?.accountNumber ?? 'N/A',
+                  value: emp.payrollDetails.bankDetails.accountNumber.isEmpty
+                      ? 'N/A'
+                      : emp.payrollDetails.bankDetails.accountNumber,
                   color: Colors.green,
                 ),
                 if (emp.payrollDetails.mpesaDetails != null) ...[
@@ -1783,10 +1779,105 @@ class _EmployeeDashboardState extends State<EmployeeDashboard>
                   ),
                 ],
               ]),
+              const SizedBox(height: 24),
+              _buildSubsectionTitle('Payslip History'),
+              _buildPayslipHistoryCard(),
             ],
           ),
         ),
       ],
+    );
+  }
+
+  /// Riverpod-backed payslip history list. Uses a scoped `Consumer` rather
+  /// than converting this StatefulWidget to a ConsumerStatefulWidget — the
+  /// HR Payroll module (lib/screens/hr/Payroll/) is the only part of the app
+  /// using Riverpod, and this is its sole employee-side touchpoint.
+  Widget _buildPayslipHistoryCard() {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return const SizedBox.shrink();
+
+    return Consumer(
+      builder: (context, ref, _) {
+        final payslipsAsync = ref.watch(employeePayslipsProvider(uid));
+        return payslipsAsync.when(
+          data: (records) {
+            if (records.isEmpty) {
+              return Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey.shade200),
+                ),
+                child: const Text(
+                  'No payslips have been issued yet.',
+                  style: TextStyle(color: Colors.grey),
+                ),
+              );
+            }
+            return Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: Column(
+                children: records.map((r) => _buildPayslipTile(r)).toList(),
+              ),
+            );
+          },
+          loading: () => const Padding(
+            padding: EdgeInsets.all(16),
+            child: Center(child: CircularProgressIndicator()),
+          ),
+          error: (e, st) => Padding(
+            padding: const EdgeInsets.all(16),
+            child: Text('Could not load payslip history: $e', style: const TextStyle(color: Colors.red)),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildPayslipTile(PayrollRecord record) {
+    final monthLabel = DateFormat('MMMM yyyy').format(DateTime.parse('${record.month}-01'));
+    Color statusColor;
+    switch (record.status) {
+      case 'paid':
+        statusColor = Colors.green;
+        break;
+      case 'approved':
+        statusColor = Colors.blue;
+        break;
+      default:
+        statusColor = Colors.grey;
+    }
+
+    return ListTile(
+      leading: const Icon(Icons.receipt_long, color: Colors.purple),
+      title: Text(monthLabel, style: const TextStyle(fontWeight: FontWeight.w600)),
+      subtitle: Text(
+        'Net Pay: KES ${NumberFormat('#,##0.00').format(record.netPay)}  •  ${record.status.toUpperCase()}',
+        style: TextStyle(color: statusColor, fontSize: 12, fontWeight: FontWeight.w600),
+      ),
+      trailing: record.hasPayslip
+          ? Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.visibility, size: 20),
+                  tooltip: 'View Payslip',
+                  onPressed: () => PayrollDocumentActions.openPayslip(context, record),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.download, size: 20),
+                  tooltip: 'Download Payslip',
+                  onPressed: () => PayrollDocumentActions.downloadPayslip(context, record),
+                ),
+              ],
+            )
+          : const Text('Not issued', style: TextStyle(color: Colors.grey, fontSize: 12)),
     );
   }
 
@@ -2662,11 +2753,9 @@ class _EmployeeDashboardState extends State<EmployeeDashboard>
         icon = Icons.account_balance_wallet;
         iconColor = Colors.orange;
         tooltip = 'Accountant Dashboard';
-        onPressed = () => ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Accountant Dashboard coming soon!'),
-            backgroundColor: Colors.orange,
-          ),
+        onPressed = () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const AccountantDashboard()),
         );
         break;
       case UserRoles.supervisor:

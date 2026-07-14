@@ -25,7 +25,7 @@ class Employee {
   final String? idNumber;
   final String? kraPin;
   final String? nssfNumber;
-  final String? nhifNumber;
+  final String? shifNumber;
   
   // Next of Kin
   final String? nextOfKinName;
@@ -74,7 +74,7 @@ class Employee {
     this.idNumber,
     this.kraPin,
     this.nssfNumber,
-    this.nhifNumber,
+    this.shifNumber,
     this.nextOfKinName,
     this.nextOfKinRelation,
     this.nextOfKinPhone,
@@ -111,7 +111,7 @@ class Employee {
       'idNumber': idNumber,
       'kraPin': kraPin,
       'nssfNumber': nssfNumber,
-      'nhifNumber': nhifNumber,
+      'shifNumber': shifNumber,
       'nextOfKinName': nextOfKinName,
       'nextOfKinRelation': nextOfKinRelation,
       'nextOfKinPhone': nextOfKinPhone,
@@ -150,7 +150,7 @@ class Employee {
       idNumber: map['idNumber'],
       kraPin: map['kraPin'],
       nssfNumber: map['nssfNumber'],
-      nhifNumber: map['nhifNumber'],
+      shifNumber: map['shifNumber'],
       nextOfKinName: map['nextOfKinName'],
       nextOfKinRelation: map['nextOfKinRelation'],
       nextOfKinPhone: map['nextOfKinPhone'],
@@ -657,9 +657,8 @@ class Payroll {
   
   // Statutory Deductions
   final double payeTax;
-  final double nhifContribution;
   final double nssfContribution;
-  final double shifContribution;
+  final double shifContribution; // NHIF was replaced by SHIF/SHA
   
   // Other Deductions
   final double? loanDeduction;
@@ -686,7 +685,6 @@ class Payroll {
     required this.grossSalary,
     required this.netSalary,
     required this.payeTax,
-    required this.nhifContribution,
     required this.nssfContribution,
     required this.shifContribution,
     this.loanDeduction,
@@ -712,7 +710,6 @@ class Payroll {
       'grossSalary': grossSalary,
       'netSalary': netSalary,
       'payeTax': payeTax,
-      'nhifContribution': nhifContribution,
       'nssfContribution': nssfContribution,
       'shifContribution': shifContribution,
       'loanDeduction': loanDeduction,

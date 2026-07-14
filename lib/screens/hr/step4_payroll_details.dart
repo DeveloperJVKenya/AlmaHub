@@ -1,4 +1,4 @@
-import 'package:almahub/screens/hr/employee_onboarding_models.dart';
+import 'package:almahub/models/employee_onboarding_models.dart';
 import 'package:almahub/screens/hr/onboarding_shared_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';

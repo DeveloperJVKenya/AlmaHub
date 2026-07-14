@@ -221,8 +221,8 @@ class StatutoryDocuments {
   final String? kraPinCertificateUrl;
   final String nssfNumber;
   final String? nssfConfirmationUrl;
-  final String nhifNumber;
-  final String? nhifConfirmationUrl;
+  final String shifNumber;
+  final String? shifConfirmationUrl;
   final String? p9FormUrl;
 
   StatutoryDocuments({
@@ -230,8 +230,8 @@ class StatutoryDocuments {
     this.kraPinCertificateUrl,
     this.nssfNumber = '',
     this.nssfConfirmationUrl,
-    this.nhifNumber = '',
-    this.nhifConfirmationUrl,
+    this.shifNumber = '',
+    this.shifConfirmationUrl,
     this.p9FormUrl,
   });
 
@@ -241,8 +241,8 @@ class StatutoryDocuments {
       'kraPinCertificateUrl': kraPinCertificateUrl,
       'nssfNumber': nssfNumber,
       'nssfConfirmationUrl': nssfConfirmationUrl,
-      'nhifNumber': nhifNumber,
-      'nhifConfirmationUrl': nhifConfirmationUrl,
+      'shifNumber': shifNumber,
+      'shifConfirmationUrl': shifConfirmationUrl,
       'p9FormUrl': p9FormUrl,
     };
   }
@@ -253,8 +253,11 @@ class StatutoryDocuments {
       kraPinCertificateUrl: map['kraPinCertificateUrl'],
       nssfNumber: map['nssfNumber'] ?? '',
       nssfConfirmationUrl: map['nssfConfirmationUrl'],
-      nhifNumber: map['nhifNumber'] ?? '',
-      nhifConfirmationUrl: map['nhifConfirmationUrl'],
+      // NHIF was replaced by SHIF/SHA — 'nhifNumber'/'nhifConfirmationUrl'
+      // are the legacy keys written before this rename; fall back to them
+      // for records onboarded before the switch.
+      shifNumber: map['shifNumber'] ?? map['nhifNumber'] ?? '',
+      shifConfirmationUrl: map['shifConfirmationUrl'] ?? map['nhifConfirmationUrl'],
       p9FormUrl: map['p9FormUrl'],
     );
   }
@@ -265,14 +268,14 @@ class PayrollDetails {
   final double basicSalary;
   final Map<String, double> allowances; // housing, transport, other
   final Map<String, double> deductions; // loans, SACCO, advances
-  final BankDetails? bankDetails;
+  final BankDetails bankDetails;
   final MpesaDetails? mpesaDetails;
 
   PayrollDetails({
     this.basicSalary = 0.0,
     this.allowances = const {},
     this.deductions = const {},
-    this.bankDetails,
+    this.bankDetails = const BankDetails(),
     this.mpesaDetails,
   });
 
@@ -281,7 +284,7 @@ class PayrollDetails {
       'basicSalary': basicSalary,
       'allowances': allowances,
       'deductions': deductions,
-      'bankDetails': bankDetails?.toMap(),
+      'bankDetails': bankDetails.toMap(),
       'mpesaDetails': mpesaDetails?.toMap(),
     };
   }
@@ -289,9 +292,16 @@ class PayrollDetails {
   factory PayrollDetails.fromMap(Map<String, dynamic> map) {
     return PayrollDetails(
       basicSalary: (map['basicSalary'] ?? 0.0).toDouble(),
-      allowances: Map<String, double>.from(map['allowances'] ?? {}),
-      deductions: Map<String, double>.from(map['deductions'] ?? {}),
-      bankDetails: map['bankDetails'] != null ? BankDetails.fromMap(map['bankDetails']) : null,
+      // Cast via `num` rather than `Map<String, double>.from(...)` directly —
+      // Firestore may hand back whole-number values as `int`, and a direct
+      // `.from` cast throws at runtime if any value isn't already a double.
+      allowances: Map<String, double>.from(
+        (map['allowances'] as Map<String, dynamic>? ?? {}).map((k, v) => MapEntry(k, (v as num).toDouble())),
+      ),
+      deductions: Map<String, double>.from(
+        (map['deductions'] as Map<String, dynamic>? ?? {}).map((k, v) => MapEntry(k, (v as num).toDouble())),
+      ),
+      bankDetails: map['bankDetails'] != null ? BankDetails.fromMap(map['bankDetails']) : const BankDetails(),
       mpesaDetails: map['mpesaDetails'] != null ? MpesaDetails.fromMap(map['mpesaDetails']) : null,
     );
   }
@@ -299,19 +309,22 @@ class PayrollDetails {
 
 class BankDetails {
   final String bankName;
-  final String branch;
+  final String branchName;
+  final String accountName;
   final String accountNumber;
 
-  BankDetails({
+  const BankDetails({
     this.bankName = '',
-    this.branch = '',
+    this.branchName = '',
+    this.accountName = '',
     this.accountNumber = '',
   });
 
   Map<String, dynamic> toMap() {
     return {
       'bankName': bankName,
-      'branch': branch,
+      'branchName': branchName,
+      'accountName': accountName,
       'accountNumber': accountNumber,
     };
   }
@@ -319,7 +332,10 @@ class BankDetails {
   factory BankDetails.fromMap(Map<String, dynamic> map) {
     return BankDetails(
       bankName: map['bankName'] ?? '',
-      branch: map['branch'] ?? '',
+      // 'branch' is the legacy key written by older self-onboarding records
+      // before this was unified with the HR onboarding flow's 'branchName'.
+      branchName: map['branchName'] ?? map['branch'] ?? '',
+      accountName: map['accountName'] ?? '',
       accountNumber: map['accountNumber'] ?? '',
     );
   }
@@ -352,11 +368,13 @@ class MpesaDetails {
 // E. Academic & Professional Documents
 class AcademicDocuments {
   final List<DocumentInfo> academicCertificates;
+  final List<DocumentInfo> trainingCertificates;
   final List<DocumentInfo> professionalCertificates;
   final Map<String, String> professionalRegistrations; // e.g., EBK, ICPAK, IHRM
 
   AcademicDocuments({
     this.academicCertificates = const [],
+    this.trainingCertificates = const [],
     this.professionalCertificates = const [],
     this.professionalRegistrations = const {},
   });
@@ -364,6 +382,7 @@ class AcademicDocuments {
   Map<String, dynamic> toMap() {
     return {
       'academicCertificates': academicCertificates.map((doc) => doc.toMap()).toList(),
+      'trainingCertificates': trainingCertificates.map((doc) => doc.toMap()).toList(),
       'professionalCertificates': professionalCertificates.map((doc) => doc.toMap()).toList(),
       'professionalRegistrations': professionalRegistrations,
     };
@@ -372,6 +391,9 @@ class AcademicDocuments {
   factory AcademicDocuments.fromMap(Map<String, dynamic> map) {
     return AcademicDocuments(
       academicCertificates: (map['academicCertificates'] as List<dynamic>?)
+          ?.map((item) => DocumentInfo.fromMap(item))
+          .toList() ?? [],
+      trainingCertificates: (map['trainingCertificates'] as List<dynamic>?)
           ?.map((item) => DocumentInfo.fromMap(item))
           .toList() ?? [],
       professionalCertificates: (map['professionalCertificates'] as List<dynamic>?)
@@ -457,19 +479,19 @@ class ContractsAndForms {
 
 // G. Benefits & Insurance
 class BenefitsInsurance {
-  final List<Dependant> nhifDependants;
+  final List<Dependant> shifDependants;
   final String? medicalInsuranceFormUrl;
   final List<Beneficiary> beneficiaries;
 
   BenefitsInsurance({
-    this.nhifDependants = const [],
+    this.shifDependants = const [],
     this.medicalInsuranceFormUrl,
     this.beneficiaries = const [],
   });
 
   Map<String, dynamic> toMap() {
     return {
-      'nhifDependants': nhifDependants.map((d) => d.toMap()).toList(),
+      'shifDependants': shifDependants.map((d) => d.toMap()).toList(),
       'medicalInsuranceFormUrl': medicalInsuranceFormUrl,
       'beneficiaries': beneficiaries.map((b) => b.toMap()).toList(),
     };
@@ -477,7 +499,9 @@ class BenefitsInsurance {
 
   factory BenefitsInsurance.fromMap(Map<String, dynamic> map) {
     return BenefitsInsurance(
-      nhifDependants: (map['nhifDependants'] as List<dynamic>?)
+      // 'nhifDependants' is the legacy key from before NHIF was replaced by
+      // SHIF/SHA — fall back to it for records written before the rename.
+      shifDependants: ((map['shifDependants'] ?? map['nhifDependants']) as List<dynamic>?)
           ?.map((item) => Dependant.fromMap(item))
           .toList() ?? [],
       medicalInsuranceFormUrl: map['medicalInsuranceFormUrl'],

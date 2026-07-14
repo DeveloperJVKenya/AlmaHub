@@ -1,9 +1,89 @@
 import 'dart:typed_data';
 import 'package:almahub/models/employee_onboarding_models.dart';
+import 'package:almahub/screens/hr/Payroll/payroll_models.dart';
 import 'package:excel/excel.dart';
 import 'package:intl/intl.dart';
 
 class ExcelGenerationService {
+  /// Generate an Excel report for one payroll run: one row per employee
+  /// record plus a totals row, matching the columns HR reviews on-screen in
+  /// the Payroll module. Used by both the HR Payroll screen and the
+  /// read-only Accountant dashboard export.
+  static Future<Map<String, dynamic>> generatePayrollRunExcel(
+    PayrollRun run,
+    List<PayrollRecord> records,
+  ) async {
+    final excel = Excel.createExcel();
+    if (excel.sheets.containsKey('Sheet1')) {
+      excel.delete('Sheet1');
+    }
+
+    final sheet = excel['Payroll ${run.month}'];
+
+    final headers = [
+      'No.', 'Employee', 'Department', 'Basic Salary', 'Allowances',
+      'Overtime Hours', 'Overtime Pay', 'Gross Pay', 'PAYE', 'NSSF',
+      'SHIF', 'Housing Levy', 'Other Deductions', 'Net Pay', 'Status',
+      'Payment Method', 'Transaction Ref',
+    ];
+    sheet.appendRow(headers.map((h) => TextCellValue(h)).toList());
+
+    for (int i = 0; i < records.length; i++) {
+      final r = records[i];
+      sheet.appendRow([
+        IntCellValue(i + 1),
+        TextCellValue(r.employeeName),
+        TextCellValue(r.department),
+        DoubleCellValue(r.basicSalary),
+        DoubleCellValue(r.totalAllowances),
+        DoubleCellValue(r.overtimeHours),
+        DoubleCellValue(r.overtimePay),
+        DoubleCellValue(r.grossPay),
+        DoubleCellValue(r.payeTax),
+        DoubleCellValue(r.nssfDeduction),
+        DoubleCellValue(r.shifDeduction),
+        DoubleCellValue(r.housingLevy),
+        DoubleCellValue(r.totalOtherDeductions),
+        DoubleCellValue(r.netPay),
+        TextCellValue(r.status),
+        TextCellValue(r.paymentMethod ?? '-'),
+        TextCellValue(r.transactionRef ?? '-'),
+      ]);
+    }
+
+    sheet.appendRow([
+      TextCellValue(''),
+      TextCellValue('TOTAL'),
+      TextCellValue(''),
+      TextCellValue(''),
+      TextCellValue(''),
+      TextCellValue(''),
+      TextCellValue(''),
+      DoubleCellValue(run.totalGrossPay),
+      TextCellValue(''),
+      TextCellValue(''),
+      TextCellValue(''),
+      TextCellValue(''),
+      DoubleCellValue(run.totalStatutoryDeductions),
+      DoubleCellValue(run.totalNetPay),
+      TextCellValue(''),
+      TextCellValue(''),
+      TextCellValue(''),
+    ]);
+
+    final bytes = excel.encode();
+    if (bytes == null) {
+      throw Exception('Failed to encode payroll Excel file');
+    }
+
+    final fileName = 'Payroll_${run.month}.xlsx';
+    return {
+      'fileName': fileName,
+      'fileBytes': Uint8List.fromList(bytes),
+      'fileSize': bytes.length,
+    };
+  }
+
   /// Generate comprehensive Excel file with all employee onboarding data
   /// Returns both the file bytes and the filename
   static Future<Map<String, dynamic>> generateEmployeeOnboardingExcel(
@@ -71,7 +151,7 @@ class ExcelGenerationService {
     sheet.setColumnWidth(13, 20.0); // Supervisor
     sheet.setColumnWidth(14, 18.0); // KRA PIN
     sheet.setColumnWidth(15, 18.0); // NSSF Number
-    sheet.setColumnWidth(16, 18.0); // NHIF Number
+    sheet.setColumnWidth(16, 18.0); // SHIF Number
     sheet.setColumnWidth(17, 18.0); // Basic Salary
     sheet.setColumnWidth(18, 20.0); // Allowances
     sheet.setColumnWidth(19, 20.0); // Deductions
@@ -91,7 +171,7 @@ class ExcelGenerationService {
     sheet.setColumnWidth(33, 15.0); // NDA Signed
     sheet.setColumnWidth(34, 20.0); // Code of Conduct
     sheet.setColumnWidth(35, 20.0); // Data Protection
-    sheet.setColumnWidth(36, 25.0); // NHIF Dependants
+    sheet.setColumnWidth(36, 25.0); // SHIF Dependants
     sheet.setColumnWidth(37, 25.0); // Beneficiaries
     sheet.setColumnWidth(38, 25.0); // Issued Equipment
     sheet.setColumnWidth(39, 18.0); // HRIS Profile
@@ -134,7 +214,7 @@ class ExcelGenerationService {
       'Supervisor/Manager',
       'KRA PIN',
       'NSSF Number',
-      'NHIF Number',
+      'SHIF Number',
       'Basic Salary (KES)',
       'Allowances (KES)',
       'Deductions (KES)',
@@ -154,7 +234,7 @@ class ExcelGenerationService {
       'NDA Signed',
       'Code of Conduct Acknowledged',
       'Data Protection Consent',
-      'NHIF Dependants',
+      'SHIF Dependants',
       'Beneficiaries',
       'Issued Equipment',
       'HRIS Profile Created',
@@ -233,12 +313,14 @@ class ExcelGenerationService {
         employee.employmentDetails.supervisorName,
         employee.statutoryDocs.kraPinNumber,
         employee.statutoryDocs.nssfNumber,
-        employee.statutoryDocs.nhifNumber,
+        employee.statutoryDocs.shifNumber,
         currencyFormat.format(employee.payrollDetails.basicSalary),
         formatMoneyMap(employee.payrollDetails.allowances),
         formatMoneyMap(employee.payrollDetails.deductions),
-        employee.payrollDetails.bankDetails?.bankName ?? '-',
-        employee.payrollDetails.bankDetails?.accountNumber ?? '-',
+        employee.payrollDetails.bankDetails.bankName.isEmpty ? '-' : employee.payrollDetails.bankDetails.bankName,
+        employee.payrollDetails.bankDetails.accountNumber.isEmpty
+            ? '-'
+            : employee.payrollDetails.bankDetails.accountNumber,
         employee.payrollDetails.mpesaDetails?.phoneNumber ?? '-',
         employee.workTools.workEmail ?? '-',
         employee.status.toUpperCase(),
@@ -261,8 +343,8 @@ class ExcelGenerationService {
         employee.contractsForms.ndaUrl != null ? 'Yes' : 'No',
         employee.contractsForms.codeOfConductAcknowledged ? 'Yes' : 'No',
         employee.contractsForms.dataProtectionConsentGiven ? 'Yes' : 'No',
-        employee.benefitsInsurance.nhifDependants.isNotEmpty
-            ? employee.benefitsInsurance.nhifDependants
+        employee.benefitsInsurance.shifDependants.isNotEmpty
+            ? employee.benefitsInsurance.shifDependants
                 .map((d) => '${d.name} (${d.relationship})')
                 .join('; ')
             : 'None',
@@ -284,7 +366,9 @@ class ExcelGenerationService {
         currencyFormat.format(getDeduction(employee.payrollDetails.deductions, 'loans')),
         currencyFormat.format(getDeduction(employee.payrollDetails.deductions, 'sacco')),
         currencyFormat.format(getDeduction(employee.payrollDetails.deductions, 'advance')),
-        employee.payrollDetails.bankDetails?.branch ?? '-',
+        employee.payrollDetails.bankDetails.branchName.isEmpty
+            ? '-'
+            : employee.payrollDetails.bankDetails.branchName,
         employee.payrollDetails.mpesaDetails?.name ?? '-',
       ];
 

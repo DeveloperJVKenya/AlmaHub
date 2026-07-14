@@ -79,26 +79,12 @@ service cloud.firestore {
     }
 
     // ============================================
-    // DRAFT COLLECTION
-    // ============================================
-    match /Draft/{draftId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null;
-      allow update: if request.auth != null &&
-                       (
-                         resource.data.uid == request.auth.uid ||
-                         request.auth != null
-                       );
-      allow delete: if request.auth != null;
-      match /DailyHours/{dateKey} {
-        allow read: if request.auth != null;
-        allow create, update: if request.auth != null;
-        allow delete: if request.auth != null;
-      }
-    }
-
-    // ============================================
     // EMPLOYEE DETAILS COLLECTION
+    // Draft and fully-submitted onboarding records both
+    // live here — the `status` field distinguishes them,
+    // not the collection. (There used to be a separate
+    // `Draft` collection; it was consolidated into this
+    // one — see CLAUDE.md.)
     // ============================================
     match /EmployeeDetails/{employeeId} {
       allow read: if request.auth != null;
@@ -159,6 +145,30 @@ service cloud.firestore {
       allow create: if request.auth != null;
       allow update: if request.auth != null;
       allow delete: if request.auth != null;
+    }
+
+    // ============================================
+    // PAYROLL COLLECTIONS (NEW)
+    // Managed by HR via lib/screens/hr/Payroll/.
+    // Follows the same broad request.auth != null
+    // convention already used throughout this file —
+    // role gating (HR/Admin write, Accountant/Employee
+    // read-only) is enforced at the app layer, same as
+    // CompanyPolicies/LeaveData above.
+    // ============================================
+    match /PayrollSettings/{settingsId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+
+    match /PayrollRuns/{runId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+
+    match /PayrollRecords/{recordId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
     }
   }
 }

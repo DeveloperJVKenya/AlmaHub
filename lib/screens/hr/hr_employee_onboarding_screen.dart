@@ -1,4 +1,5 @@
-import 'package:almahub/screens/hr/employee_onboarding_models.dart';
+import 'package:almahub/models/employee_onboarding_models.dart';
+import 'package:almahub/screens/hr/onboarding_completeness.dart';
 import 'package:almahub/screens/hr/onboarding_shared_widgets.dart';
 import 'package:almahub/screens/hr/step1_personal_info.dart';
 import 'package:almahub/screens/hr/step2_employment_details.dart';
@@ -33,7 +34,7 @@ const _kStepMeta = [
   ),
   _StepMeta(
     title: 'Statutory Docs',
-    subtitle: 'KRA, NSSF & NHIF',
+    subtitle: 'KRA, NSSF & SHIF',
     icon: Icons.gavel_rounded,
     color: Color(0xFF0891B2),
   ),
@@ -88,19 +89,17 @@ class _StepMeta {
 
 /// Opens the 8-step HR-driven onboarding form.
 ///
-/// Pass [employeeId] + [initialData] when editing an existing record.
-/// Pass [collectionSource] ('Draft' or 'EmployeeDetails') so the screen
-/// knows which collection the record lives in when editing.
+/// Pass [employeeId] + [initialData] when editing an existing record. All
+/// onboarding records — draft or fully submitted — live in the single
+/// `EmployeeDetails` collection; `status` is what distinguishes them.
 class HREmployeeOnboardingScreen extends StatefulWidget {
   final String? employeeId;
   final Map<String, dynamic>? initialData;
-  final String collectionSource;
 
   const HREmployeeOnboardingScreen({
     super.key,
     this.employeeId,
     this.initialData,
-    this.collectionSource = 'Draft',
   });
 
   @override
@@ -179,7 +178,7 @@ class _HREmployeeOnboardingScreenState
     _statutoryDocs = StatutoryDocuments(
       kraPinNumber: '',
       nssfNumber: '',
-      nhifNumber: '',
+      shifNumber: '',
     );
     _payrollDetails = PayrollDetails(
       basicSalary: 0,
@@ -203,7 +202,7 @@ class _HREmployeeOnboardingScreenState
       dataProtectionConsentGiven: false,
     );
     _benefitsInsurance = BenefitsInsurance(
-      nhifDependants: [],
+      shifDependants: [],
       beneficiaries: [],
     );
     _workTools = WorkToolsAccess(
@@ -255,8 +254,10 @@ class _HREmployeeOnboardingScreenState
       kraPinCertificateUrl: sd['kraPinCertificateUrl'],
       nssfNumber: sd['nssfNumber'] ?? '',
       nssfConfirmationUrl: sd['nssfConfirmationUrl'],
-      nhifNumber: sd['nhifNumber'] ?? '',
-      nhifConfirmationUrl: sd['nhifConfirmationUrl'],
+      // 'nhifNumber'/'nhifConfirmationUrl' are legacy keys from before NHIF
+      // was replaced by SHIF/SHA — fall back to them for older records.
+      shifNumber: sd['shifNumber'] ?? sd['nhifNumber'] ?? '',
+      shifConfirmationUrl: sd['shifConfirmationUrl'] ?? sd['nhifConfirmationUrl'],
       p9FormUrl: sd['p9FormUrl'],
     );
 
@@ -308,7 +309,9 @@ class _HREmployeeOnboardingScreenState
     // Benefits & Insurance
     final bi = (data['benefitsInsurance'] as Map<String, dynamic>?) ?? {};
     _benefitsInsurance = BenefitsInsurance(
-      nhifDependants: _parseDependants(bi['nhifDependants']),
+      // 'nhifDependants' is the legacy key from before NHIF was replaced by
+      // SHIF/SHA — fall back to it for older records.
+      shifDependants: _parseDependants(bi['shifDependants'] ?? bi['nhifDependants']),
       medicalInsuranceFormUrl: bi['medicalInsuranceFormUrl'],
       beneficiaries: _parseBeneficiaries(bi['beneficiaries']),
     );
@@ -520,8 +523,8 @@ class _HREmployeeOnboardingScreenState
           'kraPinCertificateUrl': _statutoryDocs.kraPinCertificateUrl,
           'nssfNumber': _statutoryDocs.nssfNumber,
           'nssfConfirmationUrl': _statutoryDocs.nssfConfirmationUrl,
-          'nhifNumber': _statutoryDocs.nhifNumber,
-          'nhifConfirmationUrl': _statutoryDocs.nhifConfirmationUrl,
+          'shifNumber': _statutoryDocs.shifNumber,
+          'shifConfirmationUrl': _statutoryDocs.shifConfirmationUrl,
           'p9FormUrl': _statutoryDocs.p9FormUrl,
         },
         'payrollDetails': {
@@ -560,7 +563,7 @@ class _HREmployeeOnboardingScreenState
               : null,
         },
         'benefitsInsurance': {
-          'nhifDependants': _benefitsInsurance.nhifDependants
+          'shifDependants': _benefitsInsurance.shifDependants
               .map((d) => {
                     'name': d.name,
                     'relationship': d.relationship,
@@ -629,12 +632,22 @@ class _HREmployeeOnboardingScreenState
   }
 
   // ── Save Draft ─────────────────────────────────────────────────────────────
+  //
+  // HR and Employee onboarding records live in a single `EmployeeDetails`
+  // collection — `status` ('draft'/'submitted'/'approved'/'rejected') is the
+  // only completeness signal, there is no separate `Draft` collection to
+  // move records between. Saving a draft is always an in-place
+  // create-or-update on the same document.
   Future<void> _saveDraft() async {
     setState(() => _isSaving = true);
     try {
+      final isNewRecord = _documentId == null;
       final payload = _buildDataMap()
         ..['status'] = 'draft'
         ..['updatedAt'] = FieldValue.serverTimestamp();
+      if (isNewRecord) {
+        payload['createdAt'] = FieldValue.serverTimestamp();
+      }
 
       // Resolve the document ID:
       //   • edit mode  → reuse the ID we already have
@@ -642,11 +655,11 @@ class _HREmployeeOnboardingScreenState
       final docId = _documentId ?? _buildDocumentId();
 
       await _firestore
-          .collection('Draft')
+          .collection('EmployeeDetails')
           .doc(docId)
           .set(payload, SetOptions(merge: true));
 
-      if (_documentId == null) {
+      if (isNewRecord) {
         setState(() => _documentId = docId);
       }
 
@@ -682,13 +695,64 @@ class _HREmployeeOnboardingScreenState
 
   // ── Submit ─────────────────────────────────────────────────────────────────
   Future<void> _submitOnboarding() async {
-    // Validate the current (last) step's form first
-    final isValid = _formKeys[_currentStep].currentState?.validate() ?? false;
-    if (!isValid) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please complete all required fields before submitting.'),
-          backgroundColor: Colors.orange,
+    // Validate against the actual DATA, not the currently-mounted step's
+    // Form widget — `_buildStepContent` only ever builds one step at a time
+    // (a `switch`, not an `IndexedStack`), so `_formKeys[i].currentState` is
+    // null for every step except whichever one happens to be on screen right
+    // now. Checking only `_formKeys[_currentStep]` let HR jump straight to
+    // step 8 and submit a record with incomplete earlier steps (including
+    // Payroll Details) — this is the bug being fixed here.
+    final incompleteSteps = OnboardingCompleteness.incompleteStepLabels(
+      personalInfo: _personalInfo,
+      employmentDetails: _employmentDetails,
+      statutoryDocs: _statutoryDocs,
+      payrollDetails: _payrollDetails,
+    );
+
+    if (incompleteSteps.isNotEmpty) {
+      final firstIncomplete = OnboardingCompleteness.firstIncompleteStepIndex(
+        personalInfo: _personalInfo,
+        employmentDetails: _employmentDetails,
+        statutoryDocs: _statutoryDocs,
+        payrollDetails: _payrollDetails,
+      );
+      if (firstIncomplete != null) _goToStep(firstIncomplete);
+
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: Colors.orange),
+              SizedBox(width: 10),
+              Text('Incomplete Record'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Please complete these steps before submitting:'),
+              const SizedBox(height: 12),
+              ...incompleteSteps.map((s) => Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Text('•  $s', style: const TextStyle(fontWeight: FontWeight.w600)),
+                  )),
+            ],
+          ),
+          actions: [
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF540478),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('OK'),
+            ),
+          ],
         ),
       );
       return;
@@ -708,7 +772,7 @@ class _HREmployeeOnboardingScreenState
         content: Text(
           'Submit the onboarding record for '
           '${_personalInfo.fullName.isNotEmpty ? _personalInfo.fullName : "this employee"}?'
-          '\n\nThe record will be moved to Submitted Applications.',
+          '\n\nThe record will be marked as submitted and pending HR approval.',
         ),
         actions: [
           TextButton(
@@ -734,25 +798,26 @@ class _HREmployeeOnboardingScreenState
 
     setState(() => _isSaving = true);
     try {
+      final isNewRecord = _documentId == null;
       final payload = _buildDataMap()
         ..['status'] = 'submitted'
         ..['submittedAt'] = FieldValue.serverTimestamp()
         ..['updatedAt'] = FieldValue.serverTimestamp();
-
-      // Delete draft if it existed, then write to EmployeeDetails.
-      // The EmployeeDetails document uses the same sanitized name as the
-      // Draft so the record is identifiable at a glance in the console
-      // (e.g. "Fabron_Lubanga" instead of a random UID).
-      final employeeDocId = _buildDocumentId();
-
-      if (_documentId != null) {
-        await _firestore.collection('Draft').doc(_documentId).delete();
+      if (isNewRecord) {
+        payload['createdAt'] = FieldValue.serverTimestamp();
       }
-      payload['createdAt'] = FieldValue.serverTimestamp();
+
+      // Single collection — this is always an in-place create-or-update on
+      // the same document, never a move between collections.
+      final employeeDocId = _documentId ?? _buildDocumentId();
       await _firestore
           .collection('EmployeeDetails')
           .doc(employeeDocId)
           .set(payload, SetOptions(merge: true));
+
+      if (isNewRecord) {
+        setState(() => _documentId = employeeDocId);
+      }
 
       _logger.i('Onboarding submitted for: ${_personalInfo.fullName}');
 

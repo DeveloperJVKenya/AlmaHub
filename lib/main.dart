@@ -1,6 +1,7 @@
 import 'package:almahub/screens/authentication/splashscreen.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'firebase_options.dart';
 
 void main() async {
@@ -8,7 +9,10 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
-  runApp(const MyApp());
+  // ProviderScope is required for the Riverpod providers backing the HR
+  // Payroll module (lib/screens/hr/Payroll/). No other screen in the app
+  // currently uses Riverpod — this wrapper is otherwise a no-op.
+  runApp(const ProviderScope(child: MyApp()));
 }
 
 class MyApp extends StatelessWidget {

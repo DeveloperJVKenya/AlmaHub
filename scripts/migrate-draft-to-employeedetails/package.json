@@ -1,0 +1,10 @@
+{
+  "name": "migrate-draft-to-employeedetails",
+  "private": true,
+  "version": "1.0.0",
+  "description": "One-time migration: move all Draft/{id} docs (and their DailyHours subcollection) into EmployeeDetails/{id}, then delete the Draft copy. Run once as part of consolidating the two-collection onboarding design into a single EmployeeDetails collection with a status field.",
+  "type": "commonjs",
+  "dependencies": {
+    "firebase-admin": "^12.6.0"
+  }
+}

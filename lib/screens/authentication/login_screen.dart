@@ -98,28 +98,8 @@ class LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin 
     _logger.i('Searching user data for email: $email, uid: $uid');
 
     try {
-      // Check Draft collection by personalInfo.email
-      final draftQuery = await FirebaseFirestore.instance
-          .collection('Draft')
-          .where('personalInfo.email', isEqualTo: email)
-          .limit(1)
-          .get();
-
-      if (draftQuery.docs.isNotEmpty) {
-        final doc = draftQuery.docs.first;
-        if (doc.data()['uid'] == uid) {
-          _logger.i('User found in Draft via personalInfo.email');
-          return {
-            'collection': 'Draft',
-            'documentId': doc.id,
-            'data': doc.data(),
-            'username': doc.data()['registrationUsername'] ?? doc.id,
-            'status': doc.data()['status'],
-          };
-        }
-      }
-
-      // Check EmployeeDetails collection by personalInfo.email
+      // Draft and submitted onboarding records both live in EmployeeDetails
+      // now — `status` distinguishes them, not the collection.
       final employeeQuery = await FirebaseFirestore.instance
           .collection('EmployeeDetails')
           .where('personalInfo.email', isEqualTo: email)
@@ -140,28 +120,7 @@ class LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin 
         }
       }
 
-      // Fallback: check Draft by registrationEmail field
-      final draftEmailQuery = await FirebaseFirestore.instance
-          .collection('Draft')
-          .where('registrationEmail', isEqualTo: email)
-          .limit(1)
-          .get();
-
-      if (draftEmailQuery.docs.isNotEmpty) {
-        final doc = draftEmailQuery.docs.first;
-        if (doc.data()['uid'] == uid) {
-          _logger.i('User found in Draft via registrationEmail');
-          return {
-            'collection': 'Draft',
-            'documentId': doc.id,
-            'data': doc.data(),
-            'username': doc.data()['registrationUsername'] ?? doc.id,
-            'status': doc.data()['status'],
-          };
-        }
-      }
-
-      // Fallback: check EmployeeDetails by registrationEmail field
+      // Fallback: check by registrationEmail field
       final empEmailQuery = await FirebaseFirestore.instance
           .collection('EmployeeDetails')
           .where('registrationEmail', isEqualTo: email)

@@ -60,6 +60,7 @@ class PolicyDocumentActions {
     // Native: try a local, offline-capable open first (fast, and works
     // without connectivity once cached).
     final opened = await _openNative(url, fileType, fileName);
+    if (!context.mounted) return;
     if (!opened) {
       _showSnack(context, 'Opening $fileName in browser viewer…');
       await _openExternally(context, url, fileType, fileName);

@@ -125,21 +125,21 @@ class RegistrationScreenState extends State<RegistrationScreen>
       }
       _logger.d('User UID obtained: ${user.uid}');
 
-      // STEP 2: CHECK IF USERNAME EXISTS IN DRAFT COLLECTION
-      _logger.d('Checking if username exists in Draft collection: $usernameDocId');
+      // STEP 2: CHECK IF USERNAME EXISTS IN EMPLOYEEDETAILS COLLECTION
+      _logger.d('Checking if username exists in EmployeeDetails collection: $usernameDocId');
       final existingDraftDoc = await FirebaseFirestore.instance
-          .collection('Draft')
+          .collection('EmployeeDetails')
           .doc(usernameDocId)
           .get();
 
       if (existingDraftDoc.exists) {
-        _logger.w('Username already exists in Draft: $usernameDocId');
+        _logger.w('Username already exists in EmployeeDetails: $usernameDocId');
         // Delete the auth user we just created since username is taken
         await user.delete();
         _logger.i('Deleted Firebase Auth user due to username conflict');
         throw Exception('Username already taken');
       }
-      _logger.d('Username is available in Draft collection: $usernameDocId');
+      _logger.d('Username is available in EmployeeDetails collection: $usernameDocId');
 
       // STEP 3: CHECK IF USERNAME EXISTS IN USERS COLLECTION
       _logger.d('Checking if username exists in Users collection: $usernameDocId');
@@ -200,8 +200,8 @@ class RegistrationScreenState extends State<RegistrationScreen>
           'kraPinCertificateUrl': null,
           'nssfNumber': '',
           'nssfConfirmationUrl': null,
-          'nhifNumber': '',
-          'nhifConfirmationUrl': null,
+          'shifNumber': '',
+          'shifConfirmationUrl': null,
           'p9FormUrl': null,
         },
         'payrollDetails': {
@@ -210,7 +210,8 @@ class RegistrationScreenState extends State<RegistrationScreen>
           'deductions': {},
           'bankDetails': {
             'bankName': '',
-            'branch': '',
+            'branchName': '',
+            'accountName': '',
             'accountNumber': '',
           },
           'mpesaDetails': {
@@ -220,6 +221,7 @@ class RegistrationScreenState extends State<RegistrationScreen>
         },
         'academicDocs': {
           'academicCertificates': [],
+          'trainingCertificates': [],
           'professionalCertificates': [],
           'professionalRegistrations': {},
         },
@@ -232,7 +234,7 @@ class RegistrationScreenState extends State<RegistrationScreen>
           'consentDate': null,
         },
         'benefitsInsurance': {
-          'nhifDependants': [],
+          'shifDependants': [],
           'medicalInsuranceFormUrl': null,
           'beneficiaries': [],
         },
@@ -244,16 +246,16 @@ class RegistrationScreenState extends State<RegistrationScreen>
         },
       };
       
-      _logger.d('Creating Draft document with data');
+      _logger.d('Creating EmployeeDetails document (status: draft) with data');
       _logger.d('Document ID: $usernameDocId');
       _logger.d('Username (original): $username');
       _logger.d('Email: $email');
 
       await FirebaseFirestore.instance
-          .collection('Draft')
+          .collection('EmployeeDetails')
           .doc(usernameDocId)
           .set(draftData);
-      _logger.i('✅ Draft document created successfully for: $usernameDocId');
+      _logger.i('✅ Draft record created successfully for: $usernameDocId');
 
       // STEP 5: CREATE USER DOCUMENT IN USERS COLLECTION
       _logger.i('Creating Users collection document for: $usernameDocId');

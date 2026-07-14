@@ -1,4 +1,4 @@
-import 'package:almahub/screens/hr/employee_onboarding_models.dart';
+import 'package:almahub/models/employee_onboarding_models.dart';
 import 'package:almahub/screens/hr/onboarding_shared_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -24,13 +24,13 @@ class Step7BenefitsInsurance extends StatelessWidget {
   });
 
   BenefitsInsurance _copy({
-    List<Dependant>? nhifDependants,
+    List<Dependant>? shifDependants,
     String? medicalInsuranceFormUrl,
     List<Beneficiary>? beneficiaries,
   }) {
     return BenefitsInsurance(
-      nhifDependants:
-          nhifDependants ?? benefitsInsurance.nhifDependants,
+      shifDependants:
+          shifDependants ?? benefitsInsurance.shifDependants,
       medicalInsuranceFormUrl:
           medicalInsuranceFormUrl ?? benefitsInsurance.medicalInsuranceFormUrl,
       beneficiaries: beneficiaries ?? benefitsInsurance.beneficiaries,
@@ -55,7 +55,7 @@ class Step7BenefitsInsurance extends StatelessWidget {
             children: [
               Icon(Icons.person_add_rounded, color: OnboardingColors.primary),
               SizedBox(width: 10),
-              Text('Add NHIF Dependant',
+              Text('Add SHIF Dependant',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
             ],
           ),
@@ -133,8 +133,8 @@ class Step7BenefitsInsurance extends StatelessWidget {
                 if (nameCtrl.text.trim().isNotEmpty &&
                     relCtrl.text.trim().isNotEmpty) {
                   onChanged(_copy(
-                    nhifDependants: [
-                      ...benefitsInsurance.nhifDependants,
+                    shifDependants: [
+                      ...benefitsInsurance.shifDependants,
                       Dependant(
                         name: nameCtrl.text.trim(),
                         relationship: relCtrl.text.trim(),
@@ -269,22 +269,22 @@ class Step7BenefitsInsurance extends StatelessWidget {
             const StepHeaderCard(
               icon: Icons.favorite_rounded,
               title: 'Benefits & Insurance',
-              subtitle: 'NHIF dependants, medical cover & beneficiaries',
+              subtitle: 'SHIF dependants, medical cover & beneficiaries',
             ),
             const SizedBox(height: 20),
 
-            // ── NHIF Dependants ──────────────────────────────────────────
+            // ── SHIF Dependants ──────────────────────────────────────────
             FormSection(
-              title: 'NHIF Dependants',
+              title: 'SHIF Dependants',
               icon: Icons.family_restroom_rounded,
               children: [
-                if (benefitsInsurance.nhifDependants.isEmpty)
+                if (benefitsInsurance.shifDependants.isEmpty)
                   const InfoBanner(
                     message: 'No dependants added yet. Tap below to add.',
                     icon: Icons.info_outline_rounded,
                   )
                 else ...[
-                  ...benefitsInsurance.nhifDependants.asMap().entries.map((e) {
+                  ...benefitsInsurance.shifDependants.asMap().entries.map((e) {
                     final d = e.value;
                     return _DependantTile(
                       name: d.name,
@@ -292,9 +292,9 @@ class Step7BenefitsInsurance extends StatelessWidget {
                       dateOfBirth: d.dateOfBirth,
                       onDelete: () {
                         final updated = List<Dependant>.from(
-                            benefitsInsurance.nhifDependants)
+                            benefitsInsurance.shifDependants)
                           ..removeAt(e.key);
-                        onChanged(_copy(nhifDependants: updated));
+                        onChanged(_copy(shifDependants: updated));
                       },
                     );
                   }),
@@ -307,7 +307,7 @@ class Step7BenefitsInsurance extends StatelessWidget {
                     icon: const Icon(Icons.add_rounded,
                         color: OnboardingColors.primary),
                     label: const Text(
-                      'Add NHIF Dependant',
+                      'Add SHIF Dependant',
                       style: TextStyle(
                           color: OnboardingColors.primary,
                           fontWeight: FontWeight.w600),

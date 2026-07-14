@@ -146,24 +146,9 @@ class _SplashScreenState extends State<SplashScreen>
         return;
       }
 
-      // ── Check 2: Draft collection (mid-onboarding) ────────────────────────
-      _logger.d('Checking Draft collection for uid: ${user.uid}');
-      final draftQuery = await FirebaseFirestore.instance
-          .collection('Draft')
-          .where('uid', isEqualTo: user.uid)
-          .limit(1)
-          .get();
-
-      if (draftQuery.docs.isNotEmpty) {
-        final draftData = draftQuery.docs.first.data();
-        final username =
-            draftData['personalInfo']?['fullName'] ?? draftQuery.docs.first.id;
-        _logger.i('User found in Draft collection: $username — navigating to RoleSelectionScreen');
-        _navigateTo(const RoleSelectionScreen());
-        return;
-      }
-
-      // ── Check 3: EmployeeDetails collection (completed onboarding) ─────────
+      // ── Check 2: EmployeeDetails collection (onboarding record, draft or
+      // submitted — `status` distinguishes them, not the collection; either
+      // way this user has a record and goes to RoleSelectionScreen) ─────────
       _logger.d('Checking EmployeeDetails collection for uid: ${user.uid}');
       final employeeQuery = await FirebaseFirestore.instance
           .collection('EmployeeDetails')
